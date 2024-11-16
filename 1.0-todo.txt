@@ -1,8 +1,8 @@
 handle panning
-render to lower layer background to prevent not rendering large objects
-keep higher tree levels that are missing children loaded to prevent regions you can't draw in
+render order support
+colors
 create other trees to cover the rest of the plane
 disable rendering for high depth
 render approximation color for high depth objects that don't get rendered
-render order support
-colors
+export/import
+render to lower layer background to prevent not rendering large objects
