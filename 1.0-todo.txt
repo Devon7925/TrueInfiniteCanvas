@@ -1,0 +1,4 @@
+load parents on zoom out
+handle panning
+render to lower layer background to prevent not rendering large objects
+keep higher tree levels that are missing children loaded
