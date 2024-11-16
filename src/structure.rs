@@ -5,10 +5,10 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]
 pub struct DrawNode {
-    parent: Option<Rc<RefCell<DrawNode>>>,
+    pub parent: Option<Rc<RefCell<DrawNode>>>,
     pub children: [[Option<Rc<RefCell<DrawNode>>>; 2]; 2],
     strokes: Vec<Box<dyn CanvasDrawable>>,
-    corner: (u8, u8),
+    pub corner: (u8, u8),
 }
 
 impl Default for DrawNode {
@@ -98,14 +98,26 @@ impl DrawNode {
             new_p2 = 2.0 * new_p2;
             if self.children[y][x].is_none() {
                 self.children[y][x] = Some(Rc::new(RefCell::new(DrawNode::default())));
+                self.children[y][x].as_mut().unwrap().borrow_mut().parent = Some(ref_self);
+                self.children[y][x].as_mut().unwrap().borrow_mut().corner = (x as u8, y as u8);
             }
-            self.children[y][x].as_mut().unwrap().borrow_mut().parent = Some(ref_self);
             let ref_child = self.children[y][x].as_ref().unwrap().clone();
             self.children[y][x].as_mut().unwrap().borrow_mut().send_stroke::<T>(new_p1, new_p2, 2.0 * scale, ref_child);
             return;
         }
 
         self.strokes.push(T::from_points(p1, p2, scale));
+    }
+
+    pub fn get_or_create_parent(&mut self, ref_self: Rc<RefCell<DrawNode>>) -> Rc<RefCell<DrawNode>> {
+        if let Some(parent) = self.parent.as_ref() {
+            return parent.clone();
+        }
+        let mut parent = DrawNode::default();
+        parent.corner = self.corner;
+        parent.children[self.corner.1 as usize][self.corner.0 as usize] = Some(ref_self);
+        self.parent = Some(Rc::new(RefCell::new(parent)));
+        return self.parent.as_ref().unwrap().clone();
     }
 }
 

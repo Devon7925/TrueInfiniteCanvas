@@ -3,6 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use egui::{
     emath, pos2, vec2, Color32, Context, Frame, Pos2, Rect, Sense, Stroke, Ui, Vec2, Window,
 };
+use itertools::Itertools;
 
 use crate::structure::{DrawNode, Line};
 
@@ -67,7 +68,20 @@ impl Painting {
                 .filter(|(_, offset)| offset.x >= -1.5 && offset.x <= 2.5 && offset.y >= -1.5 && offset.y <= 2.5)
                 .collect::<Vec<_>>();
         } else if self.zoom < 0.5 {
-            self.zoom = 0.5;
+            self.zoom *= 2.0;
+            self.draw_boxes = self
+                .draw_boxes
+                .drain(..)
+                .map(|(node, pos)| {
+                    let corner = vec2(node.borrow().corner.0 as f32, node.borrow().corner.1 as f32);
+                    let ref_self = node.clone();
+                    (
+                        node.borrow_mut().get_or_create_parent(ref_self), 
+                        (pos + vec2(0.5, 0.5) - corner)/2.0
+                    )
+                })
+                .unique_by(|(_, location)| (location.x.floor() as i32, location.y.floor() as i32))
+                .collect::<Vec<_>>();
         }
 
         'input_handler: {
@@ -94,6 +108,7 @@ impl Painting {
                                 0.005 / self.zoom,
                                 node.clone(),
                             );
+                            break;
                         }
                     }
                     self.last_cursor_pos = Some(canvas_pos);
@@ -113,6 +128,15 @@ impl Painting {
                     .translate(self.zoom * offset.to_vec2() * response.rect.size()),
             );
             node.borrow().draw_grid(&painter, to_screen);
+        }
+        for (node, offset) in self.draw_boxes.iter() {
+            let to_screen = emath::RectTransform::from_to(
+                STANDARD_COORD_BOUNDS,
+                response
+                    .rect
+                    .scale_from_center(self.zoom)
+                    .translate(self.zoom * offset.to_vec2() * response.rect.size()),
+            );
             node.borrow().draw(&painter, to_screen);
         }
 
