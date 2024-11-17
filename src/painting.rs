@@ -14,6 +14,7 @@ pub struct Painting {
     draw_boxes: Vec<(Rc<RefCell<DrawNode>>, Pos2, u32)>,
     last_cursor_pos: Option<Pos2>,
     zoom: f32,
+    stroke: Stroke,
 }
 
 impl Default for Painting {
@@ -22,6 +23,7 @@ impl Default for Painting {
             draw_boxes: vec![(Rc::new(RefCell::new(DrawNode::default())), pos2(0.0, 0.0), 0)],
             last_cursor_pos: None,
             zoom: 1.0,
+            stroke: Stroke::new(1.0, Color32::from_rgb(25, 200, 100)),
         }
     }
 }
@@ -31,6 +33,9 @@ const STANDARD_COORD_BOUNDS: Rect = Rect::from_min_max(pos2(-1.0, -1.0), pos2(1.
 impl Painting {
     pub fn ui_control(&mut self, ui: &mut egui::Ui) -> egui::Response {
         ui.horizontal(|ui| {
+            ui.label("Stroke:");
+            ui.add(&mut self.stroke);
+            ui.separator();
             if ui.button("Clear Painting").clicked() {
                 *self = Self::default();
             }
@@ -143,6 +148,7 @@ impl Painting {
                                 from_screen * last_cursor_pos,
                                 from_screen * canvas_pos,
                                 0.005 / self.zoom / 2.0f32.powi(*layers_above as i32),
+                                &self.stroke,
                                 node.clone(),
                             );
 

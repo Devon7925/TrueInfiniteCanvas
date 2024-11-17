@@ -73,7 +73,7 @@ impl DrawNode {
         painter.rect_stroke(Rect::from_min_max(to_screen * pos2(-1.0, -1.0), to_screen * pos2(1.0, 1.0)), 0.0, Stroke::new(2.0, Color32::BLACK));
     }
 
-    pub fn send_stroke<T: CanvasDrawableGenerator + 'static>(&mut self, p1: Pos2, p2: Pos2, scale: f32, ref_self: Rc<RefCell<DrawNode>>) {
+    pub fn send_stroke<T: CanvasDrawableGenerator + 'static>(&mut self, p1: Pos2, p2: Pos2, scale: f32, stroke: &Stroke, ref_self: Rc<RefCell<DrawNode>>) {
         if (p1-p2).abs().max_elem() < 0.5 {
             let center = p1.lerp(p2, 0.5);
             let x = if center.x > 0.0 {1} else {0};
@@ -102,11 +102,11 @@ impl DrawNode {
                 self.children[y][x].as_mut().unwrap().borrow_mut().corner = (x as u8, y as u8);
             }
             let ref_child = self.children[y][x].as_ref().unwrap().clone();
-            self.children[y][x].as_mut().unwrap().borrow_mut().send_stroke::<T>(new_p1, new_p2, 2.0 * scale, ref_child);
+            self.children[y][x].as_mut().unwrap().borrow_mut().send_stroke::<T>(new_p1, new_p2, 2.0 * scale, stroke, ref_child);
             return;
         }
 
-        self.strokes.push(T::from_points(p1, p2, scale));
+        self.strokes.push(T::from_points(p1, p2, scale, stroke));
     }
 
     pub fn get_or_create_parent(&mut self, ref_self: Rc<RefCell<DrawNode>>) -> Rc<RefCell<DrawNode>> {
@@ -149,7 +149,7 @@ impl DrawNode {
 
 #[allow(private_bounds)]
 pub trait CanvasDrawableGenerator: CanvasDrawable {
-    fn from_points(p1: Pos2, p2: Pos2, scale: f32) -> Box<Self>;
+    fn from_points(p1: Pos2, p2: Pos2, scale: f32, stroke: &Stroke) -> Box<Self>;
 }
 
 #[typetag::serde(tag = "type")]
@@ -163,7 +163,7 @@ pub struct Line {
     start_y: f32,
     end_x: f32,
     end_y: f32,
-    stroke: f32,
+    stroke: Stroke,
 }
 
 #[typetag::serde]
@@ -175,19 +175,19 @@ impl CanvasDrawable for Line {
                 to_screen * pos2(self.start_x, self.start_y),
                 to_screen * pos2(self.end_x, self.end_y),
             ],
-            Stroke::new(self.stroke * scale_factor, Color32::GRAY),
+            Stroke::new(self.stroke.width * scale_factor, self.stroke.color),
         );
     }
 }
 
 impl CanvasDrawableGenerator for Line {
-    fn from_points(p1: Pos2, p2: Pos2, scale: f32) -> Box<Self> {
+    fn from_points(p1: Pos2, p2: Pos2, scale: f32, stroke: &Stroke) -> Box<Self> {
         Box::new(Line {
             start_x: p1.x,
             start_y: p1.y,
             end_x: p2.x,
             end_y: p2.y,
-            stroke: scale,
+            stroke: Stroke::new(stroke.width * scale, stroke.color),
         })
     }
 }
