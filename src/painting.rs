@@ -15,6 +15,7 @@ pub struct Painting {
     last_cursor_pos: Option<Pos2>,
     zoom: f32,
     stroke: Stroke,
+    next_stroke_order: u32,
 }
 
 impl Default for Painting {
@@ -24,6 +25,7 @@ impl Default for Painting {
             last_cursor_pos: None,
             zoom: 1.0,
             stroke: Stroke::new(1.0, Color32::from_rgb(25, 200, 100)),
+            next_stroke_order: 0,
         }
     }
 }
@@ -143,18 +145,19 @@ impl Painting {
                         );
                         let center = from_screen * last_cursor_pos.lerp(canvas_pos, 0.5);
                         if STANDARD_COORD_BOUNDS.contains(center) {
-                            println!("above: {layers_above}, offset: {offset}");
                             node.borrow_mut().send_stroke::<Line>(
                                 from_screen * last_cursor_pos,
                                 from_screen * canvas_pos,
                                 0.005 / self.zoom / 2.0f32.powi(*layers_above as i32),
                                 &self.stroke,
+                                self.next_stroke_order,
                                 node.clone(),
                             );
+                            println!("order: {}", self.next_stroke_order);
+                            self.next_stroke_order += 1;
 
                             if *layers_above > 0 {
                                 let (child, child_offset) = node.borrow().get_child(*layers_above, center, pos2(0.0, 0.0)).unwrap();
-                                println!("offset: {child_offset}");
                                 new_boxes.push((child, *offset + child_offset.to_vec2(), 0))
                             }
                             break;
@@ -180,15 +183,20 @@ impl Painting {
             );
             node.borrow().draw_grid(&painter, to_screen);
         }
+        let mut strokes = vec![];
         for (node, offset, _) in self.draw_boxes.iter().filter(|(_, _, layers_above)| *layers_above == 0) {
+            strokes.extend(node.borrow().get_strokes(&painter, response
+                .rect
+                .scale_from_center(self.zoom)
+                .translate(self.zoom * offset.to_vec2() * response.rect.size())));
+        }
+        strokes.sort_by_key(|(_, order, _)| *order);
+        for (stroke, _, screen_rect) in strokes {
             let to_screen = emath::RectTransform::from_to(
                 STANDARD_COORD_BOUNDS,
-                response
-                    .rect
-                    .scale_from_center(self.zoom)
-                    .translate(self.zoom * offset.to_vec2() * response.rect.size()),
+                screen_rect,
             );
-            node.borrow().draw(&painter, to_screen);
+            stroke.draw(&painter, to_screen);
         }
 
         response

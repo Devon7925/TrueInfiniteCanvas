@@ -1,13 +1,14 @@
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use egui::{emath::RectTransform, pos2, vec2, Color32, Painter, Pos2, Rect, Stroke, Ui};
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]
 pub struct DrawNode {
     pub parent: Option<Rc<RefCell<DrawNode>>>,
     pub children: [[Option<Rc<RefCell<DrawNode>>>; 2]; 2],
-    strokes: Vec<Box<dyn CanvasDrawable>>,
+    strokes: Vec<(Box<dyn CanvasDrawable>, u32)>,
     pub corner: (u8, u8),
 }
 
@@ -23,30 +24,26 @@ impl Default for DrawNode {
 }
 
 impl DrawNode {
-    pub fn draw(&self, painter: &Painter, to_screen: RectTransform) {
-        let inner_to_rect = to_screen.to().scale_from_center(0.5);
+    pub fn get_strokes(&self, painter: &Painter, screen_rect: Rect) -> Vec<(Box<dyn CanvasDrawable>, u32, Rect)> {
+        let inner_to_rect = screen_rect.scale_from_center(0.5);
+        let mut strokes = self.strokes.iter().map(|(stroke, order)| (stroke.clone(), *order, screen_rect.clone())).collect_vec();
         for y in 0..=1 {
             for x in 0..=1 {
                 if self.children[y][x].is_none() {
                     continue;
                 };
 
-                self.children[y][x].as_ref().unwrap().borrow().draw(
+                strokes.extend(self.children[y][x].as_ref().unwrap().borrow().get_strokes(
                     painter,
-                    RectTransform::from_to(
-                        to_screen.from().clone(),
                         inner_to_rect.translate(vec2(
-                            (x as f32 - 0.5) * 0.5 * to_screen.to().width(),
-                            (y as f32 - 0.5) * 0.5 * to_screen.to().height(),
+                            (x as f32 - 0.5) * 0.5 * screen_rect.width(),
+                            (y as f32 - 0.5) * 0.5 * screen_rect.height(),
                         )),
-                    ),
-                );
+                ));
             }
         }
 
-        for stroke in self.strokes.iter() {
-            stroke.draw(painter, to_screen);
-        }
+        strokes
     }
 
     pub fn draw_grid(&self, painter: &Painter, to_screen: RectTransform) {
@@ -73,40 +70,39 @@ impl DrawNode {
         painter.rect_stroke(Rect::from_min_max(to_screen * pos2(-1.0, -1.0), to_screen * pos2(1.0, 1.0)), 0.0, Stroke::new(2.0, Color32::BLACK));
     }
 
-    pub fn send_stroke<T: CanvasDrawableGenerator + 'static>(&mut self, p1: Pos2, p2: Pos2, scale: f32, stroke: &Stroke, ref_self: Rc<RefCell<DrawNode>>) {
-        if (p1-p2).abs().max_elem() < 0.5 {
-            let center = p1.lerp(p2, 0.5);
-            let x = if center.x > 0.0 {1} else {0};
-            let y = if center.y > 0.0 {1} else {0};
-            let mut new_p1 = p1;
-            let mut new_p2 = p2;
-            if x == 0 {
-                new_p1.x = p1.x + 0.5;
-                new_p2.x = p2.x + 0.5;
-            } else {
-                new_p1.x = p1.x - 0.5;
-                new_p2.x = p2.x - 0.5;
-            }
-            if y == 0 {
-                new_p1.y = p1.y + 0.5;
-                new_p2.y = p2.y + 0.5;
-            } else {
-                new_p1.y = p1.y - 0.5;
-                new_p2.y = p2.y - 0.5;
-            }
-            new_p1 = 2.0 * new_p1;
-            new_p2 = 2.0 * new_p2;
-            if self.children[y][x].is_none() {
-                self.children[y][x] = Some(Rc::new(RefCell::new(DrawNode::default())));
-                self.children[y][x].as_mut().unwrap().borrow_mut().parent = Some(ref_self);
-                self.children[y][x].as_mut().unwrap().borrow_mut().corner = (x as u8, y as u8);
-            }
-            let ref_child = self.children[y][x].as_ref().unwrap().clone();
-            self.children[y][x].as_mut().unwrap().borrow_mut().send_stroke::<T>(new_p1, new_p2, 2.0 * scale, stroke, ref_child);
+    pub fn send_stroke<T: CanvasDrawableGenerator + 'static>(&mut self, p1: Pos2, p2: Pos2, scale: f32, stroke: &Stroke, order: u32, ref_self: Rc<RefCell<DrawNode>>) {
+        if (p1-p2).abs().max_elem() >= 0.5 {
+            self.strokes.push((T::from_points(p1, p2, scale, stroke), order));
             return;
         }
-
-        self.strokes.push(T::from_points(p1, p2, scale, stroke));
+        let center = p1.lerp(p2, 0.5);
+        let x = if center.x > 0.0 {1} else {0};
+        let y = if center.y > 0.0 {1} else {0};
+        let mut new_p1 = p1;
+        let mut new_p2 = p2;
+        if x == 0 {
+            new_p1.x = p1.x + 0.5;
+            new_p2.x = p2.x + 0.5;
+        } else {
+            new_p1.x = p1.x - 0.5;
+            new_p2.x = p2.x - 0.5;
+        }
+        if y == 0 {
+            new_p1.y = p1.y + 0.5;
+            new_p2.y = p2.y + 0.5;
+        } else {
+            new_p1.y = p1.y - 0.5;
+            new_p2.y = p2.y - 0.5;
+        }
+        new_p1 = 2.0 * new_p1;
+        new_p2 = 2.0 * new_p2;
+        if self.children[y][x].is_none() {
+            self.children[y][x] = Some(Rc::new(RefCell::new(DrawNode::default())));
+            self.children[y][x].as_mut().unwrap().borrow_mut().parent = Some(ref_self);
+            self.children[y][x].as_mut().unwrap().borrow_mut().corner = (x as u8, y as u8);
+        }
+        let ref_child = self.children[y][x].as_ref().unwrap().clone();
+        self.children[y][x].as_mut().unwrap().borrow_mut().send_stroke::<T>(new_p1, new_p2, 2.0 * scale, stroke, order, ref_child);
     }
 
     pub fn get_or_create_parent(&mut self, ref_self: Rc<RefCell<DrawNode>>) -> Rc<RefCell<DrawNode>> {
@@ -153,11 +149,19 @@ pub trait CanvasDrawableGenerator: CanvasDrawable {
 }
 
 #[typetag::serde(tag = "type")]
-trait CanvasDrawable {
+pub trait CanvasDrawable {
     fn draw(&self, painter: &Painter, to_screen: RectTransform);
+    fn box_clone(&self) -> Box<dyn CanvasDrawable>;
 }
 
-#[derive(Deserialize, Serialize)]
+impl Clone for Box<dyn CanvasDrawable>
+{
+    fn clone(&self) -> Box<dyn CanvasDrawable> {
+        self.box_clone()
+    }
+}
+
+#[derive(Deserialize, Serialize, Clone)]
 pub struct Line {
     start_x: f32,
     start_y: f32,
@@ -177,6 +181,10 @@ impl CanvasDrawable for Line {
             ],
             Stroke::new(self.stroke.width * scale_factor, self.stroke.color),
         );
+    }
+
+    fn box_clone(&self) -> Box<dyn CanvasDrawable> {
+        Box::new((*self).clone())
     }
 }
 

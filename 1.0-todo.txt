@@ -1,7 +1,6 @@
-render order support
 handle panning
 create other trees to cover the rest of the plane
+export/import
 disable rendering for high depth
 render approximation color for high depth objects that don't get rendered
-export/import
 render to lower layer background to prevent not rendering large objects
