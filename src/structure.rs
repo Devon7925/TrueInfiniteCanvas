@@ -24,6 +24,15 @@ impl Default for DrawNode {
 }
 
 impl DrawNode {
+    pub fn from_corner(corner: (u8, u8)) -> Self {
+        Self {
+            parent: None,
+            children: [(); 2].map(|_| [(); 2].map(|_| None)),
+            strokes: vec![],
+            corner,
+        }
+    }
+
     pub fn get_strokes(&self, painter: &Painter, screen_rect: Rect) -> Vec<(Box<dyn CanvasDrawable>, u32, Rect)> {
         let inner_to_rect = screen_rect.scale_from_center(0.5);
         let mut strokes = self.strokes.iter().map(|(stroke, order)| (stroke.clone(), *order, screen_rect.clone())).collect_vec();
@@ -140,6 +149,32 @@ impl DrawNode {
             return Some((ref_child, new_offset));
         }
         self.children[y][x].as_ref().unwrap().borrow().get_child(layers - 1, new_pos, new_offset)
+    }
+
+    pub fn get_lowest_child(&self, layers: u32, pos: Pos2, offset: Pos2, ref_self: Rc<RefCell<DrawNode>>) -> (Rc<RefCell<DrawNode>>, Pos2, u32) {
+        if layers == 0 {
+            return (ref_self, offset, layers)
+        }
+        let x = if pos.x > 0.0 {1} else {0};
+        let y = if pos.y > 0.0 {1} else {0};
+        let mut new_pos = pos;
+        let new_offset = 2.0*offset + vec2(x as f32, y as f32)-vec2(0.5, 0.5);
+        if x == 0 {
+            new_pos.x = pos.x + 0.5;
+        } else {
+            new_pos.x = pos.x - 0.5;
+        }
+        if y == 0 {
+            new_pos.y = pos.y + 0.5;
+        } else {
+            new_pos.y = pos.y - 0.5;
+        }
+        new_pos = 2.0 * new_pos;
+        if self.children[y][x].is_none() {
+            return (ref_self, offset * 2.0f32.powi(layers as i32), layers)
+        }
+        let ref_child = self.children[y][x].as_ref().unwrap().clone();
+        self.children[y][x].as_ref().unwrap().borrow().get_lowest_child(layers - 1, new_pos, new_offset, ref_child)
     }
 }
 

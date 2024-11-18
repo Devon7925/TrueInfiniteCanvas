@@ -1,38 +1,43 @@
-# eframe template
+# True Infinite Canvas
 
-[![dependency status](https://deps.rs/repo/github/emilk/eframe_template/status.svg)](https://deps.rs/repo/github/emilk/eframe_template)
-[![Build Status](https://github.com/emilk/eframe_template/workflows/CI/badge.svg)](https://github.com/emilk/eframe_template/actions?workflow=CI)
+## What does true infinite mean?
 
-This is a template repo for [eframe](https://github.com/emilk/egui/tree/master/crates/eframe), a framework for writing apps using [egui](https://github.com/emilk/egui/).
+Some other infinite canvases can struggle due to floating point precision problems. You can't zoom in past a certain point if you are far from the center of the canvas or else lines will be stuck to a grid. This project fixes that by storing everything in a quad tree meaning the only limit is device storage. It also avoids rendering outside of view thereby making it practial to store almost arbitrary amounts in it.
 
-The goal is for this to be the simplest way to get started writing a GUI app in Rust.
+## Current project state
 
-You can compile your app natively or for the web, and share it using Github Pages.
+The project can currently best be described as pre-alpha (see `alpha-todo.txt`). It is therefore missing even basic features and has significant bugs.
 
-## Getting started
+## Project Goals
+* Allow infinite zooming in and out on any part of the canvas without quality decrease
+* Cross Platform
+    * Windows
+    * MacOS
+    * Linux
+    * Web
+    * Ios
+    * Android
+* Performant
+    * Every operation should be limited by, at maximum, visible detail
+* Be a good resource for organizing arbitrary detail
+    * High quality pen support
+    * Layers
+    * Basic Editing Tools
+        * Draw
+        * Erase
+        * Select
+        * Translate
+        * Rotate
+        * Scale
+    * Display
+        * Basic stroke
+        * Basic shapes
+        * Images
 
-Start by clicking "Use this template" at https://github.com/emilk/eframe_template/ or follow [these instructions](https://docs.github.com/en/free-pro-team@latest/github/creating-cloning-and-archiving-repositories/creating-a-repository-from-a-template).
+## Current Non-goals
+* Support for multiple users
+* Be a great tool for creating art
 
-Change the name of the crate: Choose a good name for your project, and change the name to it in:
-* `Cargo.toml`
-    * Change the `package.name` from `eframe_template` to `your_crate`.
-    * Change the `package.authors`
-* `main.rs`
-    * Change `eframe_template::TemplateApp` to `your_crate::TemplateApp`
-* `index.html`
-    * Change the `<title>eframe template</title>` to `<title>your_crate</title>`. optional.
-* `assets/sw.js`
-  * Change the `'./eframe_template.js'` to `./your_crate.js` (in `filesToCache` array)
-  * Change the `'./eframe_template_bg.wasm'` to `./your_crate_bg.wasm` (in `filesToCache` array)
-
-Alternatively, you can run `fill_template.sh` which will ask for the needed names and email and perform the above patches for you. This is particularly useful if you clone this repository outside GitHub and hence cannot make use of its
-templating function.
-
-### Learning about egui
-
-`src/app.rs` contains a simple example app. This is just to give some inspiration - most of it can be removed if you like.
-
-The official egui docs are at <https://docs.rs/egui>. If you prefer watching a video introduction, check out <https://www.youtube.com/watch?v=NtUkr_z7l84>. For inspiration, check out the [the egui web demo](https://emilk.github.io/egui/index.html) and follow the links in it to its source code.
 
 ### Testing locally
 
@@ -71,17 +76,3 @@ We use [Trunk](https://trunkrs.dev/) to build for web target.
 > If `gh-pages` is not available in `Source`, just create and push a branch called `gh-pages` and it should be available.
 >
 > If you renamed the `main` branch to something else (say you re-initialized the repository with `master` as the initial branch), be sure to edit the github workflows `.github/workflows/pages.yml` file to reflect the change
-> ```yml
-> on:
->   push:
->     branches:
->       - <branch name>
-> ```
-
-You can test the template app at <https://emilk.github.io/eframe_template/>.
-
-## Updating egui
-
-As of 2023, egui is in active development with frequent releases with breaking changes. [eframe_template](https://github.com/emilk/eframe_template/) will be updated in lock-step to always use the latest version of egui.
-
-When updating `egui` and `eframe` it is recommended you do so one version at the time, and read about the changes in [the egui changelog](https://github.com/emilk/egui/blob/master/CHANGELOG.md) and [eframe changelog](https://github.com/emilk/egui/blob/master/crates/eframe/CHANGELOG.md).

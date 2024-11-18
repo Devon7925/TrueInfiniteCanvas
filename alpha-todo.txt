@@ -1,5 +1,4 @@
-handle panning
-create other trees to cover the rest of the plane
+fix panning over to other trees after they deload crash
 export/import
 disable rendering for high depth
 render approximation color for high depth objects that don't get rendered
