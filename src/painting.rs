@@ -24,19 +24,7 @@ impl Default for Painting {
         Self {
             draw_boxes: vec![(
                 Rc::new(RefCell::new(DrawNode::from_corner((0, 0)))),
-                pos2(0.5, 0.5),
-                0,
-            ),(
-                Rc::new(RefCell::new(DrawNode::from_corner((1, 0)))),
-                pos2(-0.5, 0.5),
-                0,
-            ),(
-                Rc::new(RefCell::new(DrawNode::from_corner((0, 1)))),
-                pos2(0.5, -0.5),
-                0,
-            ),(
-                Rc::new(RefCell::new(DrawNode::from_corner((1, 1)))),
-                pos2(-0.5, -0.5),
+                pos2(0.0, 0.0),
                 0,
             )],
             last_cursor_pos: None,
@@ -253,6 +241,7 @@ impl Painting {
                     (location.x.floor() as i32, location.y.floor() as i32)
                 })
                 .collect::<Vec<_>>();
+            self.ensure_all_loaded();
         }
     }
 

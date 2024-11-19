@@ -1,4 +1,4 @@
-fix panning over to other trees after they deload crash
+fix ensure loaded arbitrarily high cost
 export/import
 disable rendering for high depth
 render approximation color for high depth objects that don't get rendered

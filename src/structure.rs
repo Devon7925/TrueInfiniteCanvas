@@ -119,7 +119,7 @@ impl DrawNode {
             return parent.clone();
         }
         let mut parent = DrawNode::default();
-        parent.corner = self.corner;
+        parent.corner = (1 - self.corner.0, 1 - self.corner.1);
         parent.children[self.corner.1 as usize][self.corner.0 as usize] = Some(ref_self);
         self.parent = Some(Rc::new(RefCell::new(parent)));
         return self.parent.as_ref().unwrap().clone();
