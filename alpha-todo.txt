@@ -1,3 +1,4 @@
+fix lack of object permanence / parents getting automatically deloaded
 fix ensure loaded arbitrarily high cost
 export/import
 disable rendering for high depth
