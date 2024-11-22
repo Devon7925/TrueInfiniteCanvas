@@ -1,5 +1,14 @@
-fix ensure loaded arbitrarily high cost
+deload unneccessary structure when it isn't needed
+    maybe make parent refs strong, remove top level keep requirement, and add a strong reference to nodes with strokes
+        makes deletion from top down harder
+    maybe make enum for child ref that can switch to using weak ref that is used for temporary structures
 export/import
 disable rendering for high depth
 render approximation color for high depth objects that don't get rendered
+render parent objects up to level where rendering to lower still doesn't work
 render to lower layer background to prevent not rendering large objects
+fix ensure loaded arbitrarily high cost
+    possibly impossible for panning case due to create neighbor having O(n) cost when creating initial structure
+    might be possible if you don't create neccessary structure when doing create neighbor but do if you zoom in / out on area without structure
+        don't know of a way to do this without storing the position of these structureless neighbors
+            the position storage would have O(n) creation cost anyways
