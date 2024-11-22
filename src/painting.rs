@@ -14,6 +14,7 @@ pub struct Painting {
     pan: Vec2,
     stroke: Stroke,
     next_stroke_order: u32,
+    debug_render: bool,
 }
 
 impl Default for Painting {
@@ -28,6 +29,7 @@ impl Default for Painting {
             pan: vec2(0.0, 0.0),
             stroke: Stroke::new(1.0, Color32::from_rgb(25, 200, 100)),
             next_stroke_order: 0,
+            debug_render: false,
         }
     }
 }
@@ -43,6 +45,7 @@ impl Painting {
             if ui.button("Clear Painting").clicked() {
                 *self = Self::default();
             }
+            ui.checkbox(&mut self.debug_render, "Debug render");
         })
         .response
     }
@@ -113,19 +116,21 @@ impl Painting {
             }
         }
 
-        for (x, y, node) in self
-            .draw_boxes
-            .cells()
-        {
-            let offset = vec2(x as f32, y as f32);
-            let to_screen = emath::RectTransform::from_to(
-                STANDARD_COORD_BOUNDS,
-                response
-                    .rect
-                    .scale_from_center(self.zoom)
-                    .translate(self.zoom * (offset - self.pan) * response.rect.size()),
-            );
-            node.borrow().draw_grid(&painter, to_screen);
+        if self.debug_render {
+            for (x, y, node) in self
+                .draw_boxes
+                .cells()
+            {
+                let offset = vec2(x as f32, y as f32);
+                let to_screen = emath::RectTransform::from_to(
+                    STANDARD_COORD_BOUNDS,
+                    response
+                        .rect
+                        .scale_from_center(self.zoom)
+                        .translate(self.zoom * (offset - self.pan) * response.rect.size()),
+                );
+                node.borrow().draw_grid(&painter, to_screen);
+            }
         }
         let mut strokes = vec![];
         for (x, y, node) in self
