@@ -51,14 +51,21 @@ impl Default for DrawNode {
 }
 
 impl DrawNode {
-    pub fn from_corner(corner: (u8, u8)) -> Self {
-        Self {
+    pub fn top_level() -> Rc<RefCell<Self>> {
+        let result = Self {
             parent: Weak::new(),
             children: [(); 2].map(|_| [(); 2].map(|_| None)),
             strokes: vec![],
-            corner,
+            corner: (0, 0),
             neighbors: (Weak::new(), Weak::new()),
+        };
+        let ref_cell = Rc::new(RefCell::new(result));
+        unsafe {
+            let ptr = Rc::into_raw(ref_cell.clone());
+            Rc::increment_strong_count(ptr);
+            Rc::from_raw(ptr);
         }
+        ref_cell
     }
 
     pub fn get_strokes(
@@ -350,6 +357,12 @@ impl DrawNode {
         }
     }
 
+    fn create_neighborless_child_wo_ref(&mut self, x: usize, y: usize, ref_self: Rc<RefCell<DrawNode>>) {
+        self.children[y][x] = Some(Rc::new(RefCell::new(DrawNode::default())));
+        self.children[y][x].as_mut().unwrap().borrow_mut().parent = Rc::downgrade(&ref_self);
+        self.children[y][x].as_mut().unwrap().borrow_mut().corner = (x as u8, y as u8);
+    }
+
     pub fn get_or_create_parent(
         &mut self,
         ref_self: Rc<RefCell<DrawNode>>,
@@ -359,14 +372,23 @@ impl DrawNode {
         }
         let mut parent = DrawNode::default();
         parent.corner = (1 - self.corner.0, 1 - self.corner.1);
-        parent.children[self.corner.1 as usize][self.corner.0 as usize] = Some(ref_self);
-        let parent = Rc::new(RefCell::new(parent));
-        self.parent = Rc::downgrade(&parent);
-        return parent;
-    }
+        parent.children[self.corner.1 as usize][self.corner.0 as usize] = Some(ref_self.clone());
 
-    pub fn get_child_from_corner(&self, corner: (u8, u8)) -> Option<Rc<RefCell<DrawNode>>> {
-        self.children[corner.1 as usize][corner.0 as usize].clone()
+        let parent = Rc::new(RefCell::new(parent));
+        unsafe {
+            let ptr = Rc::into_raw(parent.clone());
+            Rc::increment_strong_count(ptr);
+            Rc::from_raw(ptr);
+        }
+        self.parent = Rc::downgrade(&parent);
+
+        unsafe {
+            let ptr = Rc::into_raw(ref_self.clone());
+            Rc::decrement_strong_count(ptr);
+            Rc::from_raw(ptr);
+        }
+
+        return parent;
     }
 
     pub fn get_or_create_child_from_corner(
@@ -382,75 +404,17 @@ impl DrawNode {
             .unwrap()
     }
 
-    pub fn get_child(
-        &self,
-        layers: u32,
-        pos: Pos2,
-        offset: Pos2,
-    ) -> Option<(Rc<RefCell<DrawNode>>, Pos2)> {
-        let x = if pos.x > 0.0 { 1 } else { 0 };
-        let y = if pos.y > 0.0 { 1 } else { 0 };
-        let mut new_pos = pos;
-        let new_offset = 2.0 * offset + vec2(x as f32, y as f32) - vec2(0.5, 0.5);
-        if x == 0 {
-            new_pos.x = pos.x + 0.5;
-        } else {
-            new_pos.x = pos.x - 0.5;
-        }
-        if y == 0 {
-            new_pos.y = pos.y + 0.5;
-        } else {
-            new_pos.y = pos.y - 0.5;
-        }
-        new_pos = 2.0 * new_pos;
-        if self.children[y][x].is_none() {
-            return None;
-        }
-        let ref_child = self.children[y][x].as_ref().unwrap().clone();
-        if layers == 1 {
-            return Some((ref_child, new_offset));
-        }
-        self.children[y][x]
-            .as_ref()
-            .unwrap()
-            .borrow()
-            .get_child(layers - 1, new_pos, new_offset)
-    }
-
-    pub fn get_lowest_child(
-        &self,
-        layers: u32,
-        pos: Pos2,
-        offset: Pos2,
+    pub fn get_or_create_neighborless_child_from_corner(
+        &mut self,
+        corner: (u8, u8),
         ref_self: Rc<RefCell<DrawNode>>,
-    ) -> (Rc<RefCell<DrawNode>>, Pos2, u32) {
-        if layers == 0 {
-            return (ref_self, offset, layers);
+    ) -> Rc<RefCell<DrawNode>> {
+        if self.children[corner.1 as usize][corner.0 as usize].is_none() {
+            self.create_neighborless_child_wo_ref(corner.0 as usize, corner.1 as usize, ref_self);
         }
-        let x = if pos.x > 0.0 { 1 } else { 0 };
-        let y = if pos.y > 0.0 { 1 } else { 0 };
-        let mut new_pos = pos;
-        let new_offset = 2.0 * offset + vec2(x as f32, y as f32) - vec2(0.5, 0.5);
-        if x == 0 {
-            new_pos.x = pos.x + 0.5;
-        } else {
-            new_pos.x = pos.x - 0.5;
-        }
-        if y == 0 {
-            new_pos.y = pos.y + 0.5;
-        } else {
-            new_pos.y = pos.y - 0.5;
-        }
-        new_pos = 2.0 * new_pos;
-        if self.children[y][x].is_none() {
-            return (ref_self, offset * 2.0f32.powi(layers as i32), layers);
-        }
-        let ref_child = self.children[y][x].as_ref().unwrap().clone();
-        self.children[y][x]
-            .as_ref()
+        self.children[corner.1 as usize][corner.0 as usize]
+            .clone()
             .unwrap()
-            .borrow()
-            .get_lowest_child(layers - 1, new_pos, new_offset, ref_child)
     }
 
     fn get_neighbor_w_parent_ref(
@@ -526,11 +490,12 @@ impl DrawNode {
                     let parent_neighbor = parent
                         .borrow_mut()
                         .get_or_create_neighbor(direction, parent.clone());
-                    let new_neighbor = parent_neighbor.borrow_mut().get_or_create_child_from_corner(
+                    let new_neighbor = parent_neighbor.borrow_mut().get_or_create_neighborless_child_from_corner(
                         (self.corner.0, 1 - self.corner.1),
                         parent_neighbor.clone(),
                     );
-                    self.neighbors.1 = Rc::downgrade(&new_neighbor)
+                    new_neighbor.borrow_mut().neighbors.1 = Rc::downgrade(&ref_self);
+                    self.neighbors.1 = Rc::downgrade(&new_neighbor);
                 }
                 self.neighbors.1.upgrade().clone().unwrap()
             }
@@ -555,11 +520,12 @@ impl DrawNode {
                     let parent_neighbor = parent
                         .borrow_mut()
                         .get_or_create_neighbor(direction, parent.clone());
-                    let new_neighbor = parent_neighbor.borrow_mut().get_or_create_child_from_corner(
+                    let new_neighbor = parent_neighbor.borrow_mut().get_or_create_neighborless_child_from_corner(
                         (1 - self.corner.0, self.corner.1),
                         parent_neighbor.clone(),
                     );
-                    self.neighbors.0 = Rc::downgrade(&new_neighbor)
+                    new_neighbor.borrow_mut().neighbors.0 = Rc::downgrade(&ref_self);
+                    self.neighbors.0 = Rc::downgrade(&new_neighbor);
                 }
                 self.neighbors.0.upgrade().clone().unwrap()
             }

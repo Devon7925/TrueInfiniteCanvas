@@ -19,7 +19,7 @@ pub struct Painting {
 impl Default for Painting {
     fn default() -> Self {
         let mut draw_boxes = CircularBuffer2D::<Rc<RefCell<DrawNode>>, 5>::default();
-        draw_boxes.set(0, 0, Rc::new(RefCell::new(DrawNode::from_corner((0, 0)))));
+        draw_boxes.set(0, 0, DrawNode::top_level());
         draw_boxes.load_all();
         Self {
             draw_boxes,
@@ -59,7 +59,6 @@ impl Painting {
         self.handle_pan_zoom();
         // let pan_delta = ui.ctx().input(|i| i.smooth_scroll_delta);
         // self.pan += pan_delta;
-        println!("pan: {}", self.pan);
 
         'input_handler: {
             if let Some(pointer_pos) = response.interact_pointer_pos() {

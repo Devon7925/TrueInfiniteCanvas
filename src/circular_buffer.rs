@@ -18,6 +18,12 @@ impl<T, const N: usize> Default for CircularBuffer2D<T, N> {
 
 impl<T, const N: usize> CircularBuffer2D<T, N> {
     pub fn get<'a>(&'a self, x: i32, y: i32) -> Option<&'a T> {
+        if x < -(N as i32)/2 || x > N as i32/2 {
+            panic!()
+        }
+        if y < -(N as i32)/2 || y > N as i32/2 {
+            panic!()
+        }
         self.data[((x + N as i32 / 2) as usize + self.offset.0) % N]
             [((y + N as i32 / 2) as usize + self.offset.1) % N]
             .as_ref()
@@ -62,14 +68,14 @@ impl<T, const N: usize> CircularBuffer2D<T, N> {
     pub fn shift_pos_y(&mut self) {
         self.offset.1 = (self.offset.1 + 1) % N;
         for x in 0..N {
-            self.data[x][(N - 1 + self.offset.0) % N] = None;
+            self.data[x][(N - 1 + self.offset.1) % N] = None;
         }
     }
 
     pub fn shift_neg_y(&mut self) {
         self.offset.1 = (self.offset.1 + N - 1) % N;
         for x in 0..N {
-            self.data[x][self.offset.0] = None;
+            self.data[x][self.offset.1] = None;
         }
     }
 }
@@ -79,13 +85,14 @@ impl<const N: usize> CircularBuffer2D<Rc<RefCell<DrawNode>>, N> {
         let mut new_data = [(); N].map(|_| [(); N].map(|_| None));
         for x in -(N as i32) / 2..=(N as i32) / 2 {
             for y in -(N as i32) / 2..=(N as i32) / 2 {
-                let zoomed_out_node = self.get((x + corner.0 as i32) / 2, (y + corner.1 as i32) / 2);
-                let corner = (((x + 2*N as i32) as u8 + corner.0) % 2, ((y + 2*N as i32) as u8 + corner.1) %  2);
+                let zoomed_out_node = self.get(((x as f32 + corner.0 as f32) / 2.0).floor() as i32, ((y as f32 + corner.1 as f32) / 2.0).floor() as i32);
+                let corner = (((x + 2*N as i32) as u8 + corner.0) % 2, ((y + 2*N as i32) as u8 + corner.1) % 2);
                 let new_node = zoomed_out_node.map(|node| node.borrow_mut().get_or_create_child_from_corner(corner, node.clone()));
                 new_data[(x + N as i32 / 2) as usize][(y + N as i32 / 2) as usize] = new_node;
             }
         }
         self.data = new_data;
+        self.offset = (0, 0);
     }
 
     pub fn zoom_out(&mut self) {
@@ -100,6 +107,7 @@ impl<const N: usize> CircularBuffer2D<Rc<RefCell<DrawNode>>, N> {
             }
         }
         self.data = new_data;
+        self.offset = (0, 0);
     }
 
     pub fn load_all(&mut self) {
@@ -131,20 +139,21 @@ impl<const N: usize> CircularBuffer2D<Rc<RefCell<DrawNode>>, N> {
                 if self.get(x, y).is_some() {
                     continue;
                 }
-                if x + 1 <= -(N as i32) / 2 {
+                if x + 1 <= (N as i32) / 2 {
                     if let Some(right_node) = self.get(x+1, y).cloned() {
                         let neighbor = right_node.borrow_mut().get_or_create_neighbor(Direction::NegX, right_node.clone());
                         self.set(x, y, neighbor);
                         continue;
                     }
                 }
-                if y + 1 <= -(N as i32) / 2 {
+                if y + 1 <= (N as i32) / 2 {
                     if let Some(below_node) = self.get(x, y+1).cloned() {
                         let neighbor = below_node.borrow_mut().get_or_create_neighbor(Direction::NegY, below_node.clone());
                         self.set(x, y, neighbor);
                         continue;
                     }
                 }
+                panic!("{x} {y} not filled in")
             }
         }
     }
