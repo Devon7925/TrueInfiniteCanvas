@@ -16,7 +16,7 @@ impl<T, const N: usize> Default for CircularBuffer2D<T, N> {
     }
 }
 
-impl<T, const N: usize> CircularBuffer2D<T, N> {
+impl<T: Cleanupable, const N: usize> CircularBuffer2D<T, N> {
     pub fn get<'a>(&'a self, x: i32, y: i32) -> Option<&'a T> {
         if x < -(N as i32)/2 || x > N as i32/2 {
             panic!()
@@ -30,15 +30,22 @@ impl<T, const N: usize> CircularBuffer2D<T, N> {
     }
 
     pub fn set(&mut self, x: i32, y: i32, obj: T) {
+        self.clear(x, y);
         self.data[((x + N as i32 / 2) as usize + self.offset.0) % N]
             [((y + N as i32 / 2) as usize + self.offset.1) % N] = Some(obj);
     }
 
     pub fn clear(&mut self, x: i32, y: i32) {
-        self.data[((x + N as i32 / 2) as usize + self.offset.0) % N]
-            [((y + N as i32 / 2) as usize + self.offset.1) % N] = None;
+        self.deallocate(((x + N as i32 / 2) as usize + self.offset.0) % N, ((y + N as i32 / 2) as usize + self.offset.1) % N);
     }
 
+    pub fn clear_all(&mut self) {
+        for x in -(N as i32) / 2..=(N as i32) / 2 {
+            for y in -(N as i32) / 2..=(N as i32) / 2 {
+                self.clear(x, y);
+            }
+        }
+    }
     pub fn cells(&self) -> Vec<(i32, i32, &T)> {
         let mut cells = vec![];
         for x in -(N as i32) / 2..=(N as i32) / 2 {
@@ -54,29 +61,46 @@ impl<T, const N: usize> CircularBuffer2D<T, N> {
     pub fn shift_pos_x(&mut self) {
         self.offset.0 = (self.offset.0 + 1) % N;
         for y in 0..N {
-            self.data[(N - 1 + self.offset.0) % N][y] = None;
+            self.deallocate((N - 1 + self.offset.0) % N, y);
         }
     }
 
     pub fn shift_neg_x(&mut self) {
         self.offset.0 = (self.offset.0 + N - 1) % N;
         for y in 0..N {
-            self.data[self.offset.0][y] = None;
+            self.deallocate(self.offset.0, y);
         }
     }
 
     pub fn shift_pos_y(&mut self) {
         self.offset.1 = (self.offset.1 + 1) % N;
         for x in 0..N {
-            self.data[x][(N - 1 + self.offset.1) % N] = None;
+            self.deallocate(x, (N - 1 + self.offset.1) % N);
         }
     }
 
     pub fn shift_neg_y(&mut self) {
         self.offset.1 = (self.offset.1 + N - 1) % N;
         for x in 0..N {
-            self.data[x][self.offset.1] = None;
+            self.deallocate(x, self.offset.1);
         }
+    }
+
+    fn deallocate(&mut self, x: usize, y: usize) {
+        if let Some(ref mut data) = self.data[x][y] {
+            data.cleanup();
+        }
+        self.data[x][y] = None;
+    }
+}
+
+pub trait Cleanupable {
+    fn cleanup(&mut self);
+}
+
+impl Cleanupable for Rc<RefCell<DrawNode>> {
+    fn cleanup(&mut self) {
+        self.borrow_mut().try_cleanup();
     }
 }
 
@@ -91,6 +115,7 @@ impl<const N: usize> CircularBuffer2D<Rc<RefCell<DrawNode>>, N> {
                 new_data[(x + N as i32 / 2) as usize][(y + N as i32 / 2) as usize] = new_node;
             }
         }
+        self.clear_all();
         self.data = new_data;
         self.offset = (0, 0);
     }
@@ -106,6 +131,7 @@ impl<const N: usize> CircularBuffer2D<Rc<RefCell<DrawNode>>, N> {
                 new_data[(x + N as i32 / 2) as usize][(y + N as i32 / 2) as usize] = Some(parent);
             }
         }
+        self.clear_all();
         self.data = new_data;
         self.offset = (0, 0);
     }

@@ -1,12 +1,12 @@
-deload unneccessary structure when it isn't needed
-    maybe make parent refs strong, remove top level keep requirement, and add a strong reference to nodes with strokes
-        makes deletion from top down harder
-    maybe make enum for child ref that can switch to using weak ref that is used for temporary structures
 export/import
 disable rendering for high depth
 render approximation color for high depth objects that don't get rendered
 render parent objects up to level where rendering to lower still doesn't work
 render to lower layer background to prevent not rendering large objects
+enable erasing
+maybe try to clean up empty parents when panning away from transient structure
+    use queue with constant cleanup count per unit time?
+    would also be a problem when erasing
 fix ensure loaded arbitrarily high cost
     possibly impossible for panning case due to create neighbor having O(n) cost when creating initial structure
     might be possible if you don't create neccessary structure when doing create neighbor but do if you zoom in / out on area without structure

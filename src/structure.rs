@@ -531,6 +531,19 @@ impl DrawNode {
             }
         }
     }
+
+    pub fn try_cleanup(&self) {
+        if self.children.iter().flatten().any(|child| child.is_some()) {
+            return;
+        }
+        if self.strokes.len() > 0 {
+            return;
+        }
+        let Some(parent) = self.parent.upgrade() else {
+            return;
+        };
+        parent.borrow_mut().children[self.corner.1 as usize][self.corner.0 as usize] = None;
+    }
 }
 
 #[allow(private_bounds)]
