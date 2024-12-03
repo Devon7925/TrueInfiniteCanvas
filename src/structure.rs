@@ -114,14 +114,13 @@ impl DrawNode {
 
     pub fn get_strokes(
         &self,
-        painter: &Painter,
         screen_rect: Rect,
     ) -> Vec<(Box<dyn CanvasDrawable>, u32, Rect)> {
         let inner_to_rect = screen_rect.scale_from_center(0.5);
         let mut strokes = self
             .strokes
             .iter()
-            .map(|(stroke, order)| (stroke.clone(), *order, screen_rect.clone()))
+            .map(|(stroke, order)| (stroke.clone(), *order, screen_rect))
             .collect_vec();
         for y in 0..=1 {
             for x in 0..=1 {
@@ -130,7 +129,6 @@ impl DrawNode {
                 };
 
                 strokes.extend(self.children[y][x].as_ref().unwrap().borrow().get_strokes(
-                    painter,
                     inner_to_rect.translate(vec2(
                         (x as f32 - 0.5) * 0.5 * screen_rect.width(),
                         (y as f32 - 0.5) * 0.5 * screen_rect.height(),
@@ -153,7 +151,7 @@ impl DrawNode {
                 self.children[y][x].as_ref().unwrap().borrow().draw_grid(
                     painter,
                     RectTransform::from_to(
-                        to_screen.from().clone(),
+                        *to_screen.from(),
                         inner_to_rect.translate(vec2(
                             (x as f32 - 0.5) * 0.5 * to_screen.to().width(),
                             (y as f32 - 0.5) * 0.5 * to_screen.to().height(),
@@ -214,9 +212,10 @@ impl DrawNode {
             .unwrap()
             .clone()
             .borrow_mut()
-            .send_stroke_w_ref::<T>(&self, new_p1, new_p2, 2.0 * scale, stroke, order, ref_child);
+            .send_stroke_w_ref::<T>(self, new_p1, new_p2, 2.0 * scale, stroke, order, ref_child);
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn send_stroke_w_ref<T: CanvasDrawableGenerator + 'static>(
         &mut self,
         parent: &DrawNode,
@@ -262,7 +261,7 @@ impl DrawNode {
             .unwrap()
             .clone()
             .borrow_mut()
-            .send_stroke_w_ref::<T>(&self, new_p1, new_p2, 2.0 * scale, stroke, order, ref_child);
+            .send_stroke_w_ref::<T>(self, new_p1, new_p2, 2.0 * scale, stroke, order, ref_child);
     }
 
     fn create_child(
@@ -276,7 +275,7 @@ impl DrawNode {
         self.children[y][x].as_mut().unwrap().borrow_mut().parent = Rc::downgrade(&ref_self);
         self.children[y][x].as_mut().unwrap().borrow_mut().corner = (x as u8, y as u8);
         let horizontal_neighbor = self.get_neighbor_w_parent_ref(
-            &parent,
+            parent,
             if x == 1 {
                 Direction::PosX
             } else {
@@ -284,7 +283,7 @@ impl DrawNode {
             },
         );
         let vertical_neighbor = self.get_neighbor_w_parent_ref(
-            &parent,
+            parent,
             if y == 1 {
                 Direction::PosY
             } else {
@@ -300,9 +299,9 @@ impl DrawNode {
             .and_then(|neighbor| {
                 neighbor.borrow().children[y][1 - x]
                     .as_ref()
-                    .map(|neighbor| Rc::downgrade(&neighbor))
+                    .map(Rc::downgrade)
             })
-            .unwrap_or_else(|| Weak::new());
+            .unwrap_or_default();
         self.children[y][x]
             .as_mut()
             .unwrap()
@@ -312,9 +311,9 @@ impl DrawNode {
             .and_then(|neighbor| {
                 neighbor.borrow().children[1 - y][x]
                     .as_ref()
-                    .map(|neighbor| Rc::downgrade(&neighbor))
+                    .map(Rc::downgrade)
             })
-            .unwrap_or_else(|| Weak::new());
+            .unwrap_or_default();
         if let Some(ref horizontal_neighbor) = self.children[y][x]
             .as_ref()
             .unwrap()
@@ -326,7 +325,7 @@ impl DrawNode {
             horizontal_neighbor.borrow_mut().neighbors.0 = self.children[y][x]
                 .clone()
                 .map(|child| Rc::downgrade(&child))
-                .unwrap_or_else(|| Weak::new());
+                .unwrap_or_default();
         }
         if let Some(ref vertical_neighbor) = self.children[y][x]
             .as_ref()
@@ -339,7 +338,7 @@ impl DrawNode {
             vertical_neighbor.borrow_mut().neighbors.1 = self.children[y][x]
                 .clone()
                 .map(|child| Rc::downgrade(&child))
-                .unwrap_or_else(|| Weak::new());
+                .unwrap_or_default();
         }
     }
 
@@ -366,9 +365,9 @@ impl DrawNode {
             .and_then(|neighbor| {
                 neighbor.borrow().children[y][1 - x]
                     .as_ref()
-                    .map(|neighbor| Rc::downgrade(&neighbor))
+                    .map(Rc::downgrade)
             })
-            .unwrap_or_else(|| Weak::new());
+            .unwrap_or_default();
         self.children[y][x]
             .as_mut()
             .unwrap()
@@ -378,9 +377,9 @@ impl DrawNode {
             .and_then(|neighbor| {
                 neighbor.borrow().children[1 - y][x]
                     .as_ref()
-                    .map(|neighbor| Rc::downgrade(&neighbor))
+                    .map(Rc::downgrade)
             })
-            .unwrap_or_else(|| Weak::new());
+            .unwrap_or_default();
         if let Some(ref horizontal_neighbor) = self.children[y][x]
             .as_ref()
             .unwrap()
@@ -392,7 +391,7 @@ impl DrawNode {
             horizontal_neighbor.borrow_mut().neighbors.0 = self.children[y][x]
                 .clone()
                 .map(|child| Rc::downgrade(&child))
-                .unwrap_or_else(|| Weak::new());
+                .unwrap_or_default();
         }
         if let Some(ref vertical_neighbor) = self.children[y][x]
             .as_ref()
@@ -405,7 +404,7 @@ impl DrawNode {
             vertical_neighbor.borrow_mut().neighbors.1 = self.children[y][x]
                 .clone()
                 .map(|child| Rc::downgrade(&child))
-                .unwrap_or_else(|| Weak::new());
+                .unwrap_or_default();
         }
     }
 
@@ -427,8 +426,10 @@ impl DrawNode {
         if let Some(parent) = self.parent.upgrade() {
             return parent.clone();
         }
-        let mut parent = DrawNode::default();
-        parent.corner = (1 - self.corner.0, 1 - self.corner.1);
+        let mut parent = DrawNode {
+            corner: (1 - self.corner.0, 1 - self.corner.1),
+            ..DrawNode::default()
+        };
         parent.children[self.corner.1 as usize][self.corner.0 as usize] = Some(ref_self.clone());
 
         let parent = Rc::new(RefCell::new(parent));
@@ -445,7 +446,7 @@ impl DrawNode {
             Rc::from_raw(ptr);
         }
 
-        return parent;
+        parent
     }
 
     pub fn get_or_create_child_from_corner(
@@ -485,12 +486,10 @@ impl DrawNode {
             } else {
                 self.neighbors.1.upgrade().clone()
             }
+        } else if self.corner.0 != direction.is_positive() as u8 {
+            parent.children[self.corner.1 as usize][(1 - self.corner.0) as usize].clone()
         } else {
-            if self.corner.0 != direction.is_positive() as u8 {
-                parent.children[self.corner.1 as usize][(1 - self.corner.0) as usize].clone()
-            } else {
-                self.neighbors.0.upgrade().clone()
-            }
+            self.neighbors.0.upgrade().clone()
         }
     }
 
@@ -506,17 +505,15 @@ impl DrawNode {
             } else {
                 self.neighbors.1.upgrade().clone()
             }
+        } else if self.corner.0 != direction.is_positive() as u8 {
+            let Some(ref parent) = self.parent.upgrade() else {
+                return None;
+            };
+            parent.clone().borrow().children[self.corner.1 as usize]
+                [(1 - self.corner.0) as usize]
+                .clone()
         } else {
-            if self.corner.0 != direction.is_positive() as u8 {
-                let Some(ref parent) = self.parent.upgrade() else {
-                    return None;
-                };
-                parent.clone().borrow().children[self.corner.1 as usize]
-                    [(1 - self.corner.0) as usize]
-                    .clone()
-            } else {
-                self.neighbors.0.upgrade().clone()
-            }
+            self.neighbors.0.upgrade().clone()
         }
     }
 
@@ -558,38 +555,36 @@ impl DrawNode {
                 }
                 self.neighbors.1.upgrade().clone().unwrap()
             }
-        } else {
-            if self.corner.0 != direction.is_positive() as u8 {
-                if parent.clone().borrow().children[self.corner.1 as usize]
-                    [(1 - self.corner.0) as usize]
-                    .is_none()
-                {
-                    parent.clone().borrow_mut().create_child_wo_ref(
-                        (1 - self.corner.0) as usize,
-                        self.corner.1 as usize,
-                        parent.clone(),
-                    );
-                }
-                parent.clone().borrow().children[self.corner.1 as usize]
-                    [(1 - self.corner.0) as usize]
-                    .clone()
-                    .unwrap()
-            } else {
-                if self.neighbors.0.upgrade().is_none() {
-                    let parent_neighbor = parent
-                        .borrow_mut()
-                        .get_or_create_neighbor(direction, parent.clone());
-                    let new_neighbor = parent_neighbor
-                        .borrow_mut()
-                        .get_or_create_neighborless_child_from_corner(
-                            (1 - self.corner.0, self.corner.1),
-                            parent_neighbor.clone(),
-                        );
-                    new_neighbor.borrow_mut().neighbors.0 = Rc::downgrade(&ref_self);
-                    self.neighbors.0 = Rc::downgrade(&new_neighbor);
-                }
-                self.neighbors.0.upgrade().clone().unwrap()
+        } else if self.corner.0 != direction.is_positive() as u8 {
+            if parent.clone().borrow().children[self.corner.1 as usize]
+                [(1 - self.corner.0) as usize]
+                .is_none()
+            {
+                parent.clone().borrow_mut().create_child_wo_ref(
+                    (1 - self.corner.0) as usize,
+                    self.corner.1 as usize,
+                    parent.clone(),
+                );
             }
+            parent.clone().borrow().children[self.corner.1 as usize]
+                [(1 - self.corner.0) as usize]
+                .clone()
+                .unwrap()
+        } else {
+            if self.neighbors.0.upgrade().is_none() {
+                let parent_neighbor = parent
+                    .borrow_mut()
+                    .get_or_create_neighbor(direction, parent.clone());
+                let new_neighbor = parent_neighbor
+                    .borrow_mut()
+                    .get_or_create_neighborless_child_from_corner(
+                        (1 - self.corner.0, self.corner.1),
+                        parent_neighbor.clone(),
+                    );
+                new_neighbor.borrow_mut().neighbors.0 = Rc::downgrade(&ref_self);
+                self.neighbors.0 = Rc::downgrade(&new_neighbor);
+            }
+            self.neighbors.0.upgrade().clone().unwrap()
         }
     }
 
@@ -597,7 +592,7 @@ impl DrawNode {
         if self.children.iter().flatten().any(|child| child.is_some()) {
             return;
         }
-        if self.strokes.len() > 0 {
+        if !self.strokes.is_empty() {
             return;
         }
         let Some(parent) = self.parent.upgrade() else {

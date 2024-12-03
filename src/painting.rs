@@ -220,7 +220,6 @@ impl Painting {
             let offset = vec2(x as f32, y as f32);
             strokes.extend(
                 node.borrow().get_strokes(
-                    &painter,
                     response
                         .rect
                         .scale_from_center(self.zoom)

@@ -5,19 +5,13 @@ use crate::painting::Painting;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(Deserialize, Serialize)]
+#[derive(Default)]
 pub struct TemplateApp {
     // Example stuff:
     painting: Painting,
 }
 
-impl Default for TemplateApp {
-    fn default() -> Self {
-        Self {
-            // Example stuff:
-            painting: Painting::default(),
-        }
-    }
-}
+
 
 impl TemplateApp {
     /// Called once before the first frame.

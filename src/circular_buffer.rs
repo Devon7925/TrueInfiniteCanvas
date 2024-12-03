@@ -17,7 +17,7 @@ impl<T, const N: usize> Default for CircularBuffer2D<T, N> {
 }
 
 impl<T: Cleanupable, const N: usize> CircularBuffer2D<T, N> {
-    pub fn get<'a>(&'a self, x: i32, y: i32) -> Option<&'a T> {
+    pub fn get(&self, x: i32, y: i32) -> Option<&T> {
         if x < -(N as i32) / 2 || x > N as i32 / 2 {
             panic!()
         }
@@ -154,7 +154,7 @@ impl<const N: usize> CircularBuffer2D<Rc<RefCell<DrawNode>>, N> {
                 if self.get(x, y).is_some() {
                     continue;
                 }
-                if x - 1 >= -(N as i32) / 2 {
+                if x > -(N as i32) / 2 {
                     if let Some(left_node) = self.get(x - 1, y).cloned() {
                         let neighbor = left_node
                             .borrow_mut()
@@ -163,7 +163,7 @@ impl<const N: usize> CircularBuffer2D<Rc<RefCell<DrawNode>>, N> {
                         continue;
                     }
                 }
-                if y - 1 >= -(N as i32) / 2 {
+                if y > -(N as i32) / 2 {
                     if let Some(above_node) = self.get(x, y - 1).cloned() {
                         let neighbor = above_node
                             .borrow_mut()
@@ -181,7 +181,7 @@ impl<const N: usize> CircularBuffer2D<Rc<RefCell<DrawNode>>, N> {
                 if self.get(x, y).is_some() {
                     continue;
                 }
-                if x + 1 <= (N as i32) / 2 {
+                if x < (N as i32) / 2 {
                     if let Some(right_node) = self.get(x + 1, y).cloned() {
                         let neighbor = right_node
                             .borrow_mut()
@@ -190,7 +190,7 @@ impl<const N: usize> CircularBuffer2D<Rc<RefCell<DrawNode>>, N> {
                         continue;
                     }
                 }
-                if y + 1 <= (N as i32) / 2 {
+                if y < (N as i32) / 2 {
                     if let Some(below_node) = self.get(x, y + 1).cloned() {
                         let neighbor = below_node
                             .borrow_mut()
