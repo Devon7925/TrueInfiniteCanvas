@@ -115,8 +115,7 @@ impl Painting {
                 ui.output_mut(|output| output.copied_text = export);
             }
             if ui.button("Import").clicked() {
-                let ctx = ClipboardContext::new().unwrap();
-                let clipboard = ctx.get_text().unwrap_or("".to_string());
+                let clipboard = get_clipboard();
                 let mut deserializer = ron::de::Deserializer::from_str_with_options(
                     &clipboard,
                     ron::Options::default().without_recursion_limit(),
@@ -286,4 +285,16 @@ impl Painting {
             self.draw_boxes.load_all();
         }
     }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn get_clipboard() -> String {
+    let ctx = ClipboardContext::new().unwrap();
+    ctx.get_text().unwrap_or("".to_string())
+}
+
+// When compiling to web using trunk:
+#[cfg(target_arch = "wasm32")]
+fn get_clipboard() -> String {
+    "".to_string()
 }
