@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    rc::{Rc, Weak}
+    rc::{Rc, Weak},
 };
 
 use egui::{emath::RectTransform, pos2, vec2, Color32, Painter, Pos2, Rect, Stroke};

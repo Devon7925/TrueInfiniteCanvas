@@ -18,10 +18,10 @@ impl<T, const N: usize> Default for CircularBuffer2D<T, N> {
 
 impl<T: Cleanupable, const N: usize> CircularBuffer2D<T, N> {
     pub fn get<'a>(&'a self, x: i32, y: i32) -> Option<&'a T> {
-        if x < -(N as i32)/2 || x > N as i32/2 {
+        if x < -(N as i32) / 2 || x > N as i32 / 2 {
             panic!()
         }
-        if y < -(N as i32)/2 || y > N as i32/2 {
+        if y < -(N as i32) / 2 || y > N as i32 / 2 {
             panic!()
         }
         self.data[((x + N as i32 / 2) as usize + self.offset.0) % N]
@@ -36,7 +36,10 @@ impl<T: Cleanupable, const N: usize> CircularBuffer2D<T, N> {
     }
 
     pub fn clear(&mut self, x: i32, y: i32) {
-        self.deallocate(((x + N as i32 / 2) as usize + self.offset.0) % N, ((y + N as i32 / 2) as usize + self.offset.1) % N);
+        self.deallocate(
+            ((x + N as i32 / 2) as usize + self.offset.0) % N,
+            ((y + N as i32 / 2) as usize + self.offset.1) % N,
+        );
     }
 
     pub fn clear_all(&mut self) {
@@ -109,9 +112,18 @@ impl<const N: usize> CircularBuffer2D<Rc<RefCell<DrawNode>>, N> {
         let mut new_data = [(); N].map(|_| [(); N].map(|_| None));
         for x in -(N as i32) / 2..=(N as i32) / 2 {
             for y in -(N as i32) / 2..=(N as i32) / 2 {
-                let zoomed_out_node = self.get(((x as f32 + corner.0 as f32) / 2.0).floor() as i32, ((y as f32 + corner.1 as f32) / 2.0).floor() as i32);
-                let corner = (((x + 2*N as i32) as u8 + corner.0) % 2, ((y + 2*N as i32) as u8 + corner.1) % 2);
-                let new_node = zoomed_out_node.map(|node| node.borrow_mut().get_or_create_child_from_corner(corner, node.clone()));
+                let zoomed_out_node = self.get(
+                    ((x as f32 + corner.0 as f32) / 2.0).floor() as i32,
+                    ((y as f32 + corner.1 as f32) / 2.0).floor() as i32,
+                );
+                let corner = (
+                    ((x + 2 * N as i32) as u8 + corner.0) % 2,
+                    ((y + 2 * N as i32) as u8 + corner.1) % 2,
+                );
+                let new_node = zoomed_out_node.map(|node| {
+                    node.borrow_mut()
+                        .get_or_create_child_from_corner(corner, node.clone())
+                });
                 new_data[(x + N as i32 / 2) as usize][(y + N as i32 / 2) as usize] = new_node;
             }
         }
@@ -143,15 +155,19 @@ impl<const N: usize> CircularBuffer2D<Rc<RefCell<DrawNode>>, N> {
                     continue;
                 }
                 if x - 1 >= -(N as i32) / 2 {
-                    if let Some(left_node) = self.get(x-1, y).cloned() {
-                        let neighbor = left_node.borrow_mut().get_or_create_neighbor(Direction::PosX, left_node.clone());
+                    if let Some(left_node) = self.get(x - 1, y).cloned() {
+                        let neighbor = left_node
+                            .borrow_mut()
+                            .get_or_create_neighbor(Direction::PosX, left_node.clone());
                         self.set(x, y, neighbor);
                         continue;
                     }
                 }
                 if y - 1 >= -(N as i32) / 2 {
-                    if let Some(above_node) = self.get(x, y-1).cloned() {
-                        let neighbor = above_node.borrow_mut().get_or_create_neighbor(Direction::PosY, above_node.clone());
+                    if let Some(above_node) = self.get(x, y - 1).cloned() {
+                        let neighbor = above_node
+                            .borrow_mut()
+                            .get_or_create_neighbor(Direction::PosY, above_node.clone());
                         self.set(x, y, neighbor);
                         continue;
                     }
@@ -166,15 +182,19 @@ impl<const N: usize> CircularBuffer2D<Rc<RefCell<DrawNode>>, N> {
                     continue;
                 }
                 if x + 1 <= (N as i32) / 2 {
-                    if let Some(right_node) = self.get(x+1, y).cloned() {
-                        let neighbor = right_node.borrow_mut().get_or_create_neighbor(Direction::NegX, right_node.clone());
+                    if let Some(right_node) = self.get(x + 1, y).cloned() {
+                        let neighbor = right_node
+                            .borrow_mut()
+                            .get_or_create_neighbor(Direction::NegX, right_node.clone());
                         self.set(x, y, neighbor);
                         continue;
                     }
                 }
                 if y + 1 <= (N as i32) / 2 {
-                    if let Some(below_node) = self.get(x, y+1).cloned() {
-                        let neighbor = below_node.borrow_mut().get_or_create_neighbor(Direction::NegY, below_node.clone());
+                    if let Some(below_node) = self.get(x, y + 1).cloned() {
+                        let neighbor = below_node
+                            .borrow_mut()
+                            .get_or_create_neighbor(Direction::NegY, below_node.clone());
                         self.set(x, y, neighbor);
                         continue;
                     }

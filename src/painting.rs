@@ -1,17 +1,18 @@
 use std::{cell::RefCell, rc::Rc};
 
 use clipboard_rs::{Clipboard, ClipboardContext};
-use egui::{
-    emath, pos2, vec2, Color32, Pos2, Rect, Sense, Stroke, Ui, Vec2
-};
+use egui::{emath, pos2, vec2, Color32, Pos2, Rect, Sense, Stroke, Ui, Vec2};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::{circular_buffer::CircularBuffer2D, structure::{DrawNode, DrawNodeRef, Line}};
+use crate::{
+    circular_buffer::CircularBuffer2D,
+    structure::{DrawNode, DrawNodeRef, Line},
+};
 
 #[derive(Deserialize, Serialize)]
 pub struct Painting {
-    #[serde(serialize_with="structure_serializer")]
-    #[serde(deserialize_with="structure_deserializer")]
+    #[serde(serialize_with = "structure_serializer")]
+    #[serde(deserialize_with = "structure_deserializer")]
     draw_boxes: CircularBuffer2D<Rc<RefCell<DrawNode>>, 5>,
     last_cursor_pos: Option<Pos2>,
     zoom: f32,
@@ -27,7 +28,13 @@ struct CircularBufferSerialization {
     top_level_parent: DrawNodeRef,
 }
 
-fn structure_serializer<S>(structure: &CircularBuffer2D<Rc<RefCell<DrawNode>>, 5>, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+fn structure_serializer<S>(
+    structure: &CircularBuffer2D<Rc<RefCell<DrawNode>>, 5>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
     let Some(center_cell) = structure.get(0, 0) else {
         panic!("No center cell to serialize from");
     };
@@ -35,14 +42,24 @@ fn structure_serializer<S>(structure: &CircularBuffer2D<Rc<RefCell<DrawNode>>, 5
     CircularBufferSerialization {
         center_path: path,
         top_level_parent: DrawNodeRef(top_level),
-    }.serialize(serializer)
+    }
+    .serialize(serializer)
 }
 
-fn structure_deserializer<'de, D>(deserializer: D) -> Result<CircularBuffer2D<Rc<RefCell<DrawNode>>, 5>, D::Error> where D: Deserializer<'de> {
+fn structure_deserializer<'de, D>(
+    deserializer: D,
+) -> Result<CircularBuffer2D<Rc<RefCell<DrawNode>>, 5>, D::Error>
+where
+    D: Deserializer<'de>,
+{
     let serialization = CircularBufferSerialization::deserialize(deserializer)?;
     let mut draw_boxes = CircularBuffer2D::<Rc<RefCell<DrawNode>>, 5>::default();
     let mut center_path = serialization.center_path;
-    let center = serialization.top_level_parent.0.borrow().follow_path(&mut center_path, serialization.top_level_parent.0.clone());
+    let center = serialization
+        .top_level_parent
+        .0
+        .borrow()
+        .follow_path(&mut center_path, serialization.top_level_parent.0.clone());
     unsafe {
         let ptr = Rc::into_raw(serialization.top_level_parent.0.clone());
         Rc::increment_strong_count(ptr);
@@ -99,7 +116,7 @@ impl Painting {
             }
             if ui.button("Import").clicked() {
                 let ctx = ClipboardContext::new().unwrap();
-                let clipboard =  ctx.get_text().unwrap_or("".to_string());
+                let clipboard = ctx.get_text().unwrap_or("".to_string());
                 let mut deserializer = ron::de::Deserializer::from_str_with_options(
                     &clipboard,
                     ron::Options::default().without_recursion_limit(),
@@ -111,7 +128,7 @@ impl Painting {
                     Ok(value) => {
                         println!("Successful import");
                         *self = value;
-                    },
+                    }
                     Err(err) => {
                         // This happens on when we break the format, e.g. when updating egui.
                         log::debug!("Failed to decode RON: {err}");
@@ -148,15 +165,9 @@ impl Painting {
                         let from_screen = emath::RectTransform::from_to(
                             response
                                 .rect
-                                .scale_from_center(
-                                    5.0 * self.zoom,
-                                )
-                                .translate(
-                                    self.zoom
-                                        * -self.pan
-                                        * response.rect.size(),
-                                ),
-                            5.0/2.0*STANDARD_COORD_BOUNDS,
+                                .scale_from_center(5.0 * self.zoom)
+                                .translate(self.zoom * -self.pan * response.rect.size()),
+                            5.0 / 2.0 * STANDARD_COORD_BOUNDS,
                         );
                         let center = from_screen * last_cursor_pos.lerp(canvas_pos, 0.5);
                         let x = center.x.round() as i32;
@@ -166,8 +177,12 @@ impl Painting {
                         };
                         let p1 = 2.0 * (from_screen * last_cursor_pos - vec2(x as f32, y as f32));
                         let p2 = 2.0 * (from_screen * canvas_pos - vec2(x as f32, y as f32));
-                        let p1 = p1 / 2.0 + vec2(node.borrow().corner.0 as f32, node.borrow().corner.1 as f32) - vec2(0.5, 0.5);
-                        let p2 = p2 / 2.0 + vec2(node.borrow().corner.0 as f32, node.borrow().corner.1 as f32) - vec2(0.5, 0.5);
+                        let p1 = p1 / 2.0
+                            + vec2(node.borrow().corner.0 as f32, node.borrow().corner.1 as f32)
+                            - vec2(0.5, 0.5);
+                        let p2 = p2 / 2.0
+                            + vec2(node.borrow().corner.0 as f32, node.borrow().corner.1 as f32)
+                            - vec2(0.5, 0.5);
                         let parent = node.borrow_mut().get_or_create_parent(node.clone());
                         parent.borrow_mut().send_stroke::<Line>(
                             p1,
@@ -190,10 +205,7 @@ impl Painting {
         }
 
         if self.debug_render {
-            for (x, y, node) in self
-                .draw_boxes
-                .cells()
-            {
+            for (x, y, node) in self.draw_boxes.cells() {
                 let offset = vec2(x as f32, y as f32);
                 let to_screen = emath::RectTransform::from_to(
                     STANDARD_COORD_BOUNDS,
@@ -206,17 +218,15 @@ impl Painting {
             }
         }
         let mut strokes = vec![];
-        for (x, y, node) in self
-            .draw_boxes
-            .cells()
-        {
+        for (x, y, node) in self.draw_boxes.cells() {
             let offset = vec2(x as f32, y as f32);
             strokes.extend(
                 node.borrow().get_strokes(
                     &painter,
-                    response.rect.scale_from_center(self.zoom).translate(
-                        self.zoom * (offset - self.pan) * response.rect.size(),
-                    ),
+                    response
+                        .rect
+                        .scale_from_center(self.zoom)
+                        .translate(self.zoom * (offset - self.pan) * response.rect.size()),
                 ),
             );
         }
@@ -231,13 +241,13 @@ impl Painting {
 
     fn handle_pan_zoom(&mut self) {
         let mut changed = false;
-        
+
         if self.zoom > 2.0 {
             self.zoom /= 2.0;
             self.pan *= 2.0;
             let corner = (
-                if self.pan.x > 0.0 {1} else {0},
-                if self.pan.y > 0.0 {1} else {0},
+                if self.pan.x > 0.0 { 1 } else { 0 },
+                if self.pan.y > 0.0 { 1 } else { 0 },
             );
             self.pan.x -= corner.0 as f32 - 0.5;
             self.pan.y -= corner.1 as f32 - 0.5;
