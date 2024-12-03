@@ -205,6 +205,9 @@ impl DrawNode {
         }
         new_p1 = 2.0 * new_p1;
         new_p2 = 2.0 * new_p2;
+        if self.children[y][x].is_none() {
+            self.create_child_wo_ref(x, y, ref_self);
+        }
         let ref_child = self.children[y][x].as_ref().unwrap().clone();
         self.children[y][x]
             .as_mut()
