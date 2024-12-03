@@ -1,11 +1,12 @@
 use std::{
     cell::RefCell,
-    rc::{Rc, Weak},
+    rc::{Rc, Weak}
 };
 
 use egui::{emath::RectTransform, pos2, vec2, Color32, Painter, Pos2, Rect, Stroke};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+use tailcall::tailcall;
 
 pub enum Direction {
     PosX,
@@ -29,14 +30,57 @@ impl Direction {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Serialize)]
 pub struct DrawNode {
+    #[serde(skip)]
     pub parent: Weak<RefCell<DrawNode>>,
     pub children: [[Option<Rc<RefCell<DrawNode>>>; 2]; 2],
     strokes: Vec<(Box<dyn CanvasDrawable>, u32)>,
+    #[serde(skip)]
     pub corner: (u8, u8),
+    #[serde(skip)]
     neighbors: (Weak<RefCell<DrawNode>>, Weak<RefCell<DrawNode>>),
 }
+
+#[derive(Deserialize, Serialize)]
+struct SerializedDrawNode {
+    pub children: [[Option<Box<SerializedDrawNode>>; 2]; 2],
+    strokes: Vec<(Box<dyn CanvasDrawable>, u32)>,
+}
+
+impl From<SerializedDrawNode> for DrawNodeRef {
+    fn from(value: SerializedDrawNode) -> Self {
+        let children: [[Option<Rc<RefCell<DrawNode>>>; 2]; 2] = value
+            .children
+            .map(|row| row.map(|child| child.map(|child| DrawNodeRef::from(*child).0)));
+        let result = DrawNodeRef(Rc::new(RefCell::new(DrawNode {
+            children,
+            strokes: value.strokes,
+            ..Default::default()
+        })));
+        for x in 0..=1 {
+            for y in 0..=1 {
+                if let Some(ref child) = result.0.borrow().children[y][x] {
+                    child.borrow_mut().corner = (x as u8, y as u8);
+                    child.borrow_mut().parent = Rc::downgrade(&result.0)
+                }
+            }
+        }
+        //TODO stitch neighbors
+        result
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+struct WrappedSerializedDrawNode(SerializedDrawNode);
+impl From<WrappedSerializedDrawNode> for DrawNodeRef {
+    fn from(value: WrappedSerializedDrawNode) -> Self {
+        DrawNodeRef::from(value.0)
+    }
+}
+#[derive(Deserialize, Serialize)]
+#[serde(from = "WrappedSerializedDrawNode")]
+pub struct DrawNodeRef(pub Rc<RefCell<DrawNode>>);
 
 impl Default for DrawNode {
     fn default() -> Self {
@@ -135,6 +179,11 @@ impl DrawNode {
         order: u32,
         ref_self: Rc<RefCell<DrawNode>>,
     ) {
+        if (p1 - p2).abs().max_elem() >= 0.5 {
+            self.strokes
+                .push((T::from_points(p1, p2, scale, stroke), order));
+            return;
+        }
         let center = p1.lerp(p2, 0.5);
         let x = if center.x > 0.0 { 1 } else { 0 };
         let y = if center.y > 0.0 { 1 } else { 0 };
@@ -357,7 +406,12 @@ impl DrawNode {
         }
     }
 
-    fn create_neighborless_child_wo_ref(&mut self, x: usize, y: usize, ref_self: Rc<RefCell<DrawNode>>) {
+    fn create_neighborless_child_wo_ref(
+        &mut self,
+        x: usize,
+        y: usize,
+        ref_self: Rc<RefCell<DrawNode>>,
+    ) {
         self.children[y][x] = Some(Rc::new(RefCell::new(DrawNode::default())));
         self.children[y][x].as_mut().unwrap().borrow_mut().parent = Rc::downgrade(&ref_self);
         self.children[y][x].as_mut().unwrap().borrow_mut().corner = (x as u8, y as u8);
@@ -490,10 +544,12 @@ impl DrawNode {
                     let parent_neighbor = parent
                         .borrow_mut()
                         .get_or_create_neighbor(direction, parent.clone());
-                    let new_neighbor = parent_neighbor.borrow_mut().get_or_create_neighborless_child_from_corner(
-                        (self.corner.0, 1 - self.corner.1),
-                        parent_neighbor.clone(),
-                    );
+                    let new_neighbor = parent_neighbor
+                        .borrow_mut()
+                        .get_or_create_neighborless_child_from_corner(
+                            (self.corner.0, 1 - self.corner.1),
+                            parent_neighbor.clone(),
+                        );
                     new_neighbor.borrow_mut().neighbors.1 = Rc::downgrade(&ref_self);
                     self.neighbors.1 = Rc::downgrade(&new_neighbor);
                 }
@@ -520,10 +576,12 @@ impl DrawNode {
                     let parent_neighbor = parent
                         .borrow_mut()
                         .get_or_create_neighbor(direction, parent.clone());
-                    let new_neighbor = parent_neighbor.borrow_mut().get_or_create_neighborless_child_from_corner(
-                        (1 - self.corner.0, self.corner.1),
-                        parent_neighbor.clone(),
-                    );
+                    let new_neighbor = parent_neighbor
+                        .borrow_mut()
+                        .get_or_create_neighborless_child_from_corner(
+                            (1 - self.corner.0, self.corner.1),
+                            parent_neighbor.clone(),
+                        );
                     new_neighbor.borrow_mut().neighbors.0 = Rc::downgrade(&ref_self);
                     self.neighbors.0 = Rc::downgrade(&new_neighbor);
                 }
@@ -543,6 +601,39 @@ impl DrawNode {
             return;
         };
         parent.borrow_mut().children[self.corner.1 as usize][self.corner.0 as usize] = None;
+    }
+
+    #[tailcall]
+    pub fn get_top_level_and_path(
+        mut path: Vec<(u8, u8)>,
+        ref_self: Rc<RefCell<DrawNode>>,
+    ) -> (Rc<RefCell<DrawNode>>, Vec<(u8, u8)>) {
+        let Some(parent) = ref_self.borrow().parent.upgrade() else {
+            return (ref_self, path);
+        };
+        path.push(ref_self.borrow().corner);
+        DrawNode::get_top_level_and_path(path, parent.clone())
+    }
+
+    pub fn follow_path(
+        &self,
+        path: &mut Vec<(u8, u8)>,
+        ref_self: Rc<RefCell<DrawNode>>,
+    ) -> Rc<RefCell<DrawNode>> {
+        let Some(corner) = path.pop() else {
+            return ref_self;
+        };
+        return self.children[corner.1 as usize][corner.0 as usize]
+            .as_ref()
+            .unwrap()
+            .borrow()
+            .follow_path(
+                path,
+                self.children[corner.1 as usize][corner.0 as usize]
+                    .as_ref()
+                    .unwrap()
+                    .clone(),
+            );
     }
 }
 

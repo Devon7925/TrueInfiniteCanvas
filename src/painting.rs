@@ -1,13 +1,17 @@
 use std::{cell::RefCell, rc::Rc};
 
+use clipboard_rs::{Clipboard, ClipboardContext};
 use egui::{
-    emath, pos2, vec2, Color32, Pos2, Rect, Sense, Stroke, Ui, Vec2,
+    emath, pos2, vec2, Color32, Pos2, Rect, Sense, Stroke, Ui, Vec2
 };
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::{circular_buffer::CircularBuffer2D, structure::{DrawNode, Line}};
+use crate::{circular_buffer::CircularBuffer2D, structure::{DrawNode, DrawNodeRef, Line}};
 
+#[derive(Deserialize, Serialize)]
 pub struct Painting {
-    /// in 0-1 normalized coordinates
+    #[serde(serialize_with="structure_serializer")]
+    #[serde(deserialize_with="structure_deserializer")]
     draw_boxes: CircularBuffer2D<Rc<RefCell<DrawNode>>, 5>,
     last_cursor_pos: Option<Pos2>,
     zoom: f32,
@@ -15,6 +19,38 @@ pub struct Painting {
     stroke: Stroke,
     next_stroke_order: u32,
     debug_render: bool,
+}
+
+#[derive(Deserialize, Serialize)]
+struct CircularBufferSerialization {
+    center_path: Vec<(u8, u8)>,
+    top_level_parent: DrawNodeRef,
+}
+
+fn structure_serializer<S>(structure: &CircularBuffer2D<Rc<RefCell<DrawNode>>, 5>, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+    let Some(center_cell) = structure.get(0, 0) else {
+        panic!("No center cell to serialize from");
+    };
+    let (top_level, path) = DrawNode::get_top_level_and_path(vec![], center_cell.clone());
+    CircularBufferSerialization {
+        center_path: path,
+        top_level_parent: DrawNodeRef(top_level),
+    }.serialize(serializer)
+}
+
+fn structure_deserializer<'de, D>(deserializer: D) -> Result<CircularBuffer2D<Rc<RefCell<DrawNode>>, 5>, D::Error> where D: Deserializer<'de> {
+    let serialization = CircularBufferSerialization::deserialize(deserializer)?;
+    let mut draw_boxes = CircularBuffer2D::<Rc<RefCell<DrawNode>>, 5>::default();
+    let mut center_path = serialization.center_path;
+    let center = serialization.top_level_parent.0.borrow().follow_path(&mut center_path, serialization.top_level_parent.0.clone());
+    unsafe {
+        let ptr = Rc::into_raw(serialization.top_level_parent.0.clone());
+        Rc::increment_strong_count(ptr);
+        Rc::from_raw(ptr);
+    }
+    draw_boxes.set(0, 0, center);
+    draw_boxes.load_all();
+    Ok(draw_boxes)
 }
 
 impl Default for Painting {
@@ -46,6 +82,43 @@ impl Painting {
                 *self = Self::default();
             }
             ui.checkbox(&mut self.debug_render, "Debug render");
+            if ui.button("Export").clicked() {
+                let mut out = Vec::new();
+                let mut serializer = ron::ser::Serializer::with_options(
+                    &mut out,
+                    None,
+                    ron::Options::default().without_recursion_limit(),
+                )
+                .unwrap();
+                let serializer = serde_stacker::Serializer::new(&mut serializer);
+                let export = match self.serialize(serializer) {
+                    Ok(_) => String::from_utf8(out).expect("Ron should be utf-8"),
+                    Err(err) => panic!("eframe failed to encode data using ron: {}", err),
+                };
+                ui.output_mut(|output| output.copied_text = export);
+            }
+            if ui.button("Import").clicked() {
+                let ctx = ClipboardContext::new().unwrap();
+                let clipboard =  ctx.get_text().unwrap_or("".to_string());
+                let mut deserializer = ron::de::Deserializer::from_str_with_options(
+                    &clipboard,
+                    ron::Options::default().without_recursion_limit(),
+                )
+                .unwrap();
+                let deserializer = serde_stacker::Deserializer::new(&mut deserializer);
+                println!("Trying import");
+                match Painting::deserialize(deserializer) {
+                    Ok(value) => {
+                        println!("Successful import");
+                        *self = value;
+                    },
+                    Err(err) => {
+                        // This happens on when we break the format, e.g. when updating egui.
+                        log::debug!("Failed to decode RON: {err}");
+                        eprintln!("Failed to decode RON: {err}");
+                    }
+                };
+            }
         })
         .response
     }

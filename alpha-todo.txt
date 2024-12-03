@@ -1,4 +1,3 @@
-export/import
 disable rendering for high depth
 render approximation color for high depth objects that don't get rendered
 render parent objects up to level where rendering to lower still doesn't work
