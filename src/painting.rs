@@ -1,6 +1,5 @@
 use std::{cell::RefCell, rc::Rc};
 
-use clipboard_rs::{Clipboard, ClipboardContext};
 use egui::{emath, pos2, vec2, Color32, Pos2, Rect, Sense, Stroke, Ui, Vec2};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -289,6 +288,7 @@ impl Painting {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn get_clipboard() -> String {
+    use clipboard_rs::{Clipboard, ClipboardContext};
     let ctx = ClipboardContext::new().unwrap();
     ctx.get_text().unwrap_or("".to_string())
 }

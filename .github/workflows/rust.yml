@@ -157,14 +157,3 @@ jobs:
       with:
         name: true_infinite_canvas-${{ matrix.TARGET }}${{ matrix.EXTENSION }}
         path: true_infinite_canvas-${{ matrix.TARGET }}${{ matrix.EXTENSION }}
-
-    - uses: svenstaro/upload-release-action@v2
-      name: Upload binaries to release
-      if: ${{ github.event_name == 'push' }}
-      with:
-        repo_token: ${{ secrets.GITHUB_TOKEN }}
-        file: true_infinite_canvas-${{ matrix.TARGET }}${{ matrix.EXTENSION }}
-        asset_name: true_infinite_canvas-${{ matrix.TARGET }}${{ matrix.EXTENSION }}
-        tag: ${{ github.ref }}
-        prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        overwrite: true
