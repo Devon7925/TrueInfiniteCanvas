@@ -142,7 +142,8 @@ impl Painting {
         let (mut response, painter) =
             ui.allocate_painter(ui.available_size_before_wrap(), Sense::click_and_drag());
 
-        let drag_input = response.dragged_by(egui::PointerButton::Middle) || response.drag_started_by(egui::PointerButton::Middle);
+        let drag_input = response.dragged_by(egui::PointerButton::Middle)
+            || response.drag_started_by(egui::PointerButton::Middle);
         if let Some(pointer) = ui.ctx().input(|i| i.pointer.hover_pos()) {
             let from_screen = emath::RectTransform::from_to(
                 response
@@ -153,7 +154,7 @@ impl Painting {
             );
             let transformed_pointer_pos = from_screen * pointer;
             let zoom_delta = ui.ctx().input(|i| i.zoom_delta());
-            self.pan += (zoom_delta - 1.0) * (transformed_pointer_pos - self.pan).to_vec2(); 
+            self.pan += (zoom_delta - 1.0) * (transformed_pointer_pos - self.pan).to_vec2();
             self.zoom *= zoom_delta;
         }
         if response.dragged() && drag_input {
@@ -165,7 +166,9 @@ impl Painting {
 
         'input_handler: {
             if let Some(pointer_pos) = response.interact_pointer_pos() {
-                if response.drag_started_by(egui::PointerButton::Primary) || response.dragged_by(egui::PointerButton::Primary) {
+                if response.drag_started_by(egui::PointerButton::Primary)
+                    || response.dragged_by(egui::PointerButton::Primary)
+                {
                     let canvas_pos = pointer_pos;
                     let Some(last_cursor_pos) = self.last_cursor_pos else {
                         self.last_cursor_pos = Some(canvas_pos);
