@@ -142,18 +142,30 @@ impl Painting {
         let (mut response, painter) =
             ui.allocate_painter(ui.available_size_before_wrap(), Sense::click_and_drag());
 
-        let zoom_delta = ui.ctx().input(|i| i.zoom_delta());
-        self.zoom *= zoom_delta;
-        if response.dragged() && response.dragged_by(egui::PointerButton::Middle) {
+        let drag_input = response.dragged_by(egui::PointerButton::Middle) || response.drag_started_by(egui::PointerButton::Middle);
+        if let Some(pointer) = ui.ctx().input(|i| i.pointer.hover_pos()) {
+            let from_screen = emath::RectTransform::from_to(
+                response
+                    .rect
+                    .scale_from_center(5.0 * self.zoom)
+                    .translate(self.zoom * -self.pan * response.rect.size()),
+                5.0 / 2.0 * STANDARD_COORD_BOUNDS,
+            );
+            let transformed_pointer_pos = from_screen * pointer;
+            let zoom_delta = ui.ctx().input(|i| i.zoom_delta());
+            self.pan += (zoom_delta - 1.0) * (transformed_pointer_pos - self.pan).to_vec2(); 
+            self.zoom *= zoom_delta;
+        }
+        if response.dragged() && drag_input {
             self.pan -= response.drag_delta() / self.zoom / response.rect.size();
         }
+        let pan_delta = ui.ctx().input(|i| i.smooth_scroll_delta);
+        self.pan -= pan_delta / self.zoom / response.rect.size();
         self.handle_pan_zoom();
-        // let pan_delta = ui.ctx().input(|i| i.smooth_scroll_delta);
-        // self.pan += pan_delta;
 
         'input_handler: {
             if let Some(pointer_pos) = response.interact_pointer_pos() {
-                if !response.dragged_by(egui::PointerButton::Middle) {
+                if response.drag_started_by(egui::PointerButton::Primary) || response.dragged_by(egui::PointerButton::Primary) {
                     let canvas_pos = pointer_pos;
                     let Some(last_cursor_pos) = self.last_cursor_pos else {
                         self.last_cursor_pos = Some(canvas_pos);
