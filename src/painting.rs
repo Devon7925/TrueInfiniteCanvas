@@ -1,6 +1,7 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashSet, rc::Rc};
 
 use egui::{emath, pos2, vec2, Color32, Pos2, Rect, Sense, Stroke, Ui, Vec2};
+use itertools::Itertools;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{
@@ -239,8 +240,34 @@ impl Painting {
                         .rect
                         .scale_from_center(self.zoom)
                         .translate(self.zoom * (offset - self.pan) * response.rect.size()),
+                        14,
                 ),
             );
+        }
+        let mut parents_to_draw = self.draw_boxes.cells().into_iter().map(|(x, y, node)| {
+            let offset = vec2(x as f32, y as f32);
+            (
+                node.clone(),
+                response
+                    .rect
+                    .scale_from_center(self.zoom)
+                    .translate(self.zoom * (offset - self.pan) * response.rect.size()),
+            )
+        }).collect_vec();
+        for _layer_above in 0..14 {
+            let next_result = parents_to_draw.drain(..).flat_map(|(node, to_screen)| {
+                node.borrow().parent.upgrade().map(|parent|
+                (
+                    parent,
+                    node.borrow().get_parent_rect(to_screen),
+                ))
+            }).collect_vec();
+            for next_element in next_result {
+                if !parents_to_draw.iter().any(|e| Rc::ptr_eq(&e.0, &next_element.0)) {
+                    strokes.extend(next_element.0.borrow().get_own_strokes(next_element.1));
+                    parents_to_draw.push(next_element);
+                }
+            }
         }
         strokes.sort_by_key(|(_, order, _)| *order);
         for (stroke, _, screen_rect) in strokes {

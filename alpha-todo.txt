@@ -1,6 +1,4 @@
-disable rendering for high depth
 render approximation color for high depth objects that don't get rendered
-render parent objects up to level where rendering to lower still doesn't work
 render to lower layer background to prevent not rendering large objects
 enable erasing
 maybe try to clean up empty parents when panning away from transient structure

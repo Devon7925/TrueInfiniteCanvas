@@ -112,16 +112,27 @@ impl DrawNode {
         ref_cell
     }
 
-    pub fn get_strokes(
+    pub fn get_own_strokes(
         &self,
         screen_rect: Rect,
     ) -> Vec<(Box<dyn CanvasDrawable>, u32, Rect)> {
-        let inner_to_rect = screen_rect.scale_from_center(0.5);
-        let mut strokes = self
+        self
             .strokes
             .iter()
             .map(|(stroke, order)| (stroke.clone(), *order, screen_rect))
-            .collect_vec();
+            .collect_vec()
+    }
+
+    pub fn get_strokes(
+        &self,
+        screen_rect: Rect,
+        depth: u32,
+    ) -> Vec<(Box<dyn CanvasDrawable>, u32, Rect)> {
+        let inner_to_rect = screen_rect.scale_from_center(0.5);
+        let mut strokes = self.get_own_strokes(screen_rect);
+        if depth == 0 {
+            return strokes;
+        }
         for y in 0..=1 {
             for x in 0..=1 {
                 if self.children[y][x].is_none() {
@@ -133,11 +144,21 @@ impl DrawNode {
                         (x as f32 - 0.5) * 0.5 * screen_rect.width(),
                         (y as f32 - 0.5) * 0.5 * screen_rect.height(),
                     )),
+                    depth - 1,
                 ));
             }
         }
 
         strokes
+    }
+
+    pub fn get_parent_rect(&self, rect: Rect) -> Rect {
+        let parent_rect = rect.scale_from_center(2.0);
+        let parent_rect = parent_rect.translate(vec2(
+            (0.5 - self.corner.0 as f32) * rect.width(),
+            (0.5 - self.corner.1 as f32) * rect.height(),
+        ));
+        parent_rect
     }
 
     pub fn draw_grid(&self, painter: &Painter, to_screen: RectTransform) {
