@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashSet, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use egui::{emath, pos2, vec2, Color32, Pos2, Rect, Sense, Stroke, Ui, Vec2};
 use itertools::Itertools;
@@ -145,7 +145,17 @@ impl Painting {
 
         let drag_input = response.dragged_by(egui::PointerButton::Middle)
             || response.drag_started_by(egui::PointerButton::Middle);
-        if let Some(pointer) = ui.ctx().input(|i| i.pointer.hover_pos()) {
+        let mut did_drag = false;
+        let mut thickness_multipler = 1.0;
+        if let Some(multi_touch) = ui.ctx().multi_touch() {
+            if multi_touch.num_touches > 1 {
+                self.pan += multi_touch.translation_delta;
+                self.zoom *= multi_touch.zoom_delta;
+                did_drag = true;
+            } else if multi_touch.force > 0.0 {
+                thickness_multipler += multi_touch.force;
+            }
+        } else if let Some(pointer) = ui.ctx().input(|i| i.pointer.hover_pos()) {
             let from_screen = emath::RectTransform::from_to(
                 response
                     .rect
@@ -155,20 +165,28 @@ impl Painting {
             );
             let transformed_pointer_pos = from_screen * pointer;
             let zoom_delta = ui.ctx().input(|i| i.zoom_delta());
-            self.pan += (zoom_delta - 1.0) * (transformed_pointer_pos - self.pan).to_vec2();
-            self.zoom *= zoom_delta;
+            if zoom_delta != 1.0 {
+                self.pan += (zoom_delta - 1.0) * (transformed_pointer_pos - self.pan).to_vec2();
+                self.zoom *= zoom_delta;
+                did_drag = true;
+            }
         }
         if response.dragged() && drag_input {
             self.pan -= response.drag_delta() / self.zoom / response.rect.size();
+            did_drag = true;
         }
         let pan_delta = ui.ctx().input(|i| i.smooth_scroll_delta);
         self.pan -= pan_delta / self.zoom / response.rect.size();
         self.handle_pan_zoom();
 
+        let mut draw_stroke = self.stroke;
+        draw_stroke.width *= thickness_multipler;
+
         'input_handler: {
             if let Some(pointer_pos) = response.interact_pointer_pos() {
-                if response.drag_started_by(egui::PointerButton::Primary)
-                    || response.dragged_by(egui::PointerButton::Primary)
+                if (response.drag_started_by(egui::PointerButton::Primary)
+                    || response.dragged_by(egui::PointerButton::Primary))
+                    && !did_drag
                 {
                     let canvas_pos = pointer_pos;
                     let Some(last_cursor_pos) = self.last_cursor_pos else {
@@ -202,7 +220,7 @@ impl Painting {
                             p1,
                             p2,
                             0.005 / self.zoom,
-                            &self.stroke,
+                            &draw_stroke,
                             self.next_stroke_order,
                             node.clone(),
                         );
@@ -240,30 +258,40 @@ impl Painting {
                         .rect
                         .scale_from_center(self.zoom)
                         .translate(self.zoom * (offset - self.pan) * response.rect.size()),
-                        14,
+                    14,
                 ),
             );
         }
-        let mut parents_to_draw = self.draw_boxes.cells().into_iter().map(|(x, y, node)| {
-            let offset = vec2(x as f32, y as f32);
-            (
-                node.clone(),
-                response
-                    .rect
-                    .scale_from_center(self.zoom)
-                    .translate(self.zoom * (offset - self.pan) * response.rect.size()),
-            )
-        }).collect_vec();
-        for _layer_above in 0..14 {
-            let next_result = parents_to_draw.drain(..).flat_map(|(node, to_screen)| {
-                node.borrow().parent.upgrade().map(|parent|
+        let mut parents_to_draw = self
+            .draw_boxes
+            .cells()
+            .into_iter()
+            .map(|(x, y, node)| {
+                let offset = vec2(x as f32, y as f32);
                 (
-                    parent,
-                    node.borrow().get_parent_rect(to_screen),
-                ))
-            }).collect_vec();
+                    node.clone(),
+                    response
+                        .rect
+                        .scale_from_center(self.zoom)
+                        .translate(self.zoom * (offset - self.pan) * response.rect.size()),
+                )
+            })
+            .collect_vec();
+        for _layer_above in 0..14 {
+            let next_result = parents_to_draw
+                .drain(..)
+                .flat_map(|(node, to_screen)| {
+                    node.borrow()
+                        .parent
+                        .upgrade()
+                        .map(|parent| (parent, node.borrow().get_parent_rect(to_screen)))
+                })
+                .collect_vec();
             for next_element in next_result {
-                if !parents_to_draw.iter().any(|e| Rc::ptr_eq(&e.0, &next_element.0)) {
+                if !parents_to_draw
+                    .iter()
+                    .any(|e| Rc::ptr_eq(&e.0, &next_element.0))
+                {
                     strokes.extend(next_element.0.borrow().get_own_strokes(next_element.1));
                     parents_to_draw.push(next_element);
                 }
