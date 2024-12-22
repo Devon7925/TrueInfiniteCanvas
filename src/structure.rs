@@ -112,12 +112,8 @@ impl DrawNode {
         ref_cell
     }
 
-    pub fn get_own_strokes(
-        &self,
-        screen_rect: Rect,
-    ) -> Vec<(Box<dyn CanvasDrawable>, u32, Rect)> {
-        self
-            .strokes
+    pub fn get_own_strokes(&self, screen_rect: Rect) -> Vec<(Box<dyn CanvasDrawable>, u32, Rect)> {
+        self.strokes
             .iter()
             .map(|(stroke, order)| (stroke.clone(), *order, screen_rect))
             .collect_vec()
@@ -154,11 +150,10 @@ impl DrawNode {
 
     pub fn get_parent_rect(&self, rect: Rect) -> Rect {
         let parent_rect = rect.scale_from_center(2.0);
-        let parent_rect = parent_rect.translate(vec2(
+        parent_rect.translate(vec2(
             (0.5 - self.corner.0 as f32) * rect.width(),
             (0.5 - self.corner.1 as f32) * rect.height(),
-        ));
-        parent_rect
+        ))
     }
 
     pub fn draw_grid(&self, painter: &Painter, to_screen: RectTransform) {
@@ -517,9 +512,7 @@ impl DrawNode {
     pub fn get_neighbor(&self, direction: Direction) -> Option<Rc<RefCell<DrawNode>>> {
         if direction.is_vertical() {
             if self.corner.1 != direction.is_positive() as u8 {
-                let Some(ref parent) = self.parent.upgrade() else {
-                    return None;
-                };
+                let parent = self.parent.upgrade()?;
                 parent.clone().borrow().children[(1 - self.corner.1) as usize]
                     [self.corner.0 as usize]
                     .clone()
@@ -527,11 +520,8 @@ impl DrawNode {
                 self.neighbors.1.upgrade().clone()
             }
         } else if self.corner.0 != direction.is_positive() as u8 {
-            let Some(ref parent) = self.parent.upgrade() else {
-                return None;
-            };
-            parent.clone().borrow().children[self.corner.1 as usize]
-                [(1 - self.corner.0) as usize]
+            let parent = self.parent.upgrade()?;
+            parent.clone().borrow().children[self.corner.1 as usize][(1 - self.corner.0) as usize]
                 .clone()
         } else {
             self.neighbors.0.upgrade().clone()
@@ -587,8 +577,7 @@ impl DrawNode {
                     parent.clone(),
                 );
             }
-            parent.clone().borrow().children[self.corner.1 as usize]
-                [(1 - self.corner.0) as usize]
+            parent.clone().borrow().children[self.corner.1 as usize][(1 - self.corner.0) as usize]
                 .clone()
                 .unwrap()
         } else {
