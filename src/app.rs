@@ -4,8 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::painting::Painting;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
-#[derive(Deserialize, Serialize)]
-#[derive(Default)]
+#[derive(Deserialize, Serialize, Default)]
 pub struct TemplateApp {
     // Example stuff:
     painting: Painting,
