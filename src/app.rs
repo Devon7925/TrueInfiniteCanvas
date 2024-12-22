@@ -10,8 +10,6 @@ pub struct TemplateApp {
     painting: Painting,
 }
 
-
-
 impl TemplateApp {
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
