@@ -147,14 +147,25 @@ impl Painting {
             || response.drag_started_by(egui::PointerButton::Middle);
         let mut did_drag = false;
         let mut thickness_multipler = 1.0;
+        let touch_force = ui.input(|input| {
+            input
+                .events
+                .iter()
+                .filter_map(|evt| {
+                    if let egui::Event::Touch { force, .. } = evt {
+                        *force
+                    } else {
+                        None
+                    }
+                })
+                .next()
+        });
         if let Some(multi_touch) = ui.ctx().multi_touch() {
-            if multi_touch.num_touches > 1 {
-                self.pan += multi_touch.translation_delta;
-                self.zoom *= multi_touch.zoom_delta;
-                did_drag = true;
-            } else if multi_touch.force > 0.0 {
-                thickness_multipler += multi_touch.force;
-            }
+            self.pan += multi_touch.translation_delta / response.rect.size();
+            self.zoom *= multi_touch.zoom_delta;
+            did_drag = true;
+        } else if touch_force.unwrap_or(0.0) > 0.0 {
+            thickness_multipler += touch_force.unwrap_or(0.0);
         } else if let Some(pointer) = ui.ctx().input(|i| i.pointer.hover_pos()) {
             let from_screen = emath::RectTransform::from_to(
                 response
