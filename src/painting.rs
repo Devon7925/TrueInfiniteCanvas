@@ -160,7 +160,7 @@ impl Painting {
                 })
                 .next()
         });
-        if let Some(multi_touch) = ui.ctx().multi_touch() {
+        if let Some(multi_touch) = response.ctx.multi_touch() {
             self.pan -= multi_touch.translation_delta / response.rect.size();
             self.zoom *= multi_touch.zoom_delta;
             did_drag = true;
