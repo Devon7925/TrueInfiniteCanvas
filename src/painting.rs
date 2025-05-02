@@ -100,25 +100,25 @@ impl Painting {
             }
             ui.checkbox(&mut self.debug_render, "Debug render");
             if ui.button("Export").clicked() {
-                let mut out = Vec::new();
+                let mut out = String::new();
                 let mut serializer = ron::ser::Serializer::with_options(
                     &mut out,
                     None,
-                    ron::Options::default().without_recursion_limit(),
+                    &ron::Options::default().without_recursion_limit(),
                 )
                 .unwrap();
                 let serializer = serde_stacker::Serializer::new(&mut serializer);
                 let export = match self.serialize(serializer) {
-                    Ok(_) => String::from_utf8(out).expect("Ron should be utf-8"),
+                    Ok(_) => out,
                     Err(err) => panic!("eframe failed to encode data using ron: {}", err),
                 };
-                ui.output_mut(|output| output.copied_text = export);
+                ui.ctx().copy_text(export);
             }
             if ui.button("Import").clicked() {
                 let clipboard = get_clipboard();
                 let mut deserializer = ron::de::Deserializer::from_str_with_options(
                     &clipboard,
-                    ron::Options::default().without_recursion_limit(),
+                    &ron::Options::default().without_recursion_limit(),
                 )
                 .unwrap();
                 let deserializer = serde_stacker::Deserializer::new(&mut deserializer);

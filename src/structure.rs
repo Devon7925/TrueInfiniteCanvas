@@ -181,6 +181,7 @@ impl DrawNode {
             Rect::from_min_max(to_screen * pos2(-1.0, -1.0), to_screen * pos2(1.0, 1.0)),
             0.0,
             Stroke::new(2.0, Color32::BLACK),
+            egui::StrokeKind::Middle,
         );
     }
 

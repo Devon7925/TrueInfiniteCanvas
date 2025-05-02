@@ -24,7 +24,7 @@ impl TemplateApp {
                 storage.get_string(key).and_then(|value| {
                     let mut deserializer = ron::de::Deserializer::from_str_with_options(
                         &value,
-                        Options::default().without_recursion_limit(),
+                        &Options::default().without_recursion_limit(),
                     )
                     .unwrap();
                     let deserializer = serde_stacker::Deserializer::new(&mut deserializer);
@@ -49,16 +49,16 @@ impl eframe::App for TemplateApp {
     /// Called by the frame work to save state before shutdown.
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         let key = eframe::APP_KEY;
-        let mut out = Vec::new();
+        let mut out = String::new();
         let mut serializer = ron::ser::Serializer::with_options(
             &mut out,
             None,
-            Options::default().without_recursion_limit(),
+            &Options::default().without_recursion_limit(),
         )
         .unwrap();
         let serializer = serde_stacker::Serializer::new(&mut serializer);
         match self.serialize(serializer) {
-            Ok(_) => storage.set_string(key, String::from_utf8(out).expect("Ron should be utf-8")),
+            Ok(_) => storage.set_string(key, out),
             Err(err) => log::error!("eframe failed to encode data using ron: {}", err),
         }
     }
