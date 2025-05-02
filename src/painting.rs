@@ -164,22 +164,25 @@ impl Painting {
             self.pan -= multi_touch.translation_delta / response.rect.size();
             self.zoom *= multi_touch.zoom_delta;
             did_drag = true;
-        } else if touch_force.unwrap_or(0.0) > 0.0 {
-            thickness_multipler += touch_force.unwrap_or(0.0);
-        } else if let Some(pointer) = ui.ctx().input(|i| i.pointer.hover_pos()) {
-            let from_screen = emath::RectTransform::from_to(
-                response
-                    .rect
-                    .scale_from_center(5.0 * self.zoom)
-                    .translate(self.zoom * -self.pan * response.rect.size()),
-                5.0 / 2.0 * STANDARD_COORD_BOUNDS,
-            );
-            let transformed_pointer_pos = from_screen * pointer;
-            let zoom_delta = ui.ctx().input(|i| i.zoom_delta());
-            if zoom_delta != 1.0 {
-                self.pan += (zoom_delta - 1.0) * (transformed_pointer_pos - self.pan).to_vec2();
-                self.zoom *= zoom_delta;
-                did_drag = true;
+        } else {
+            if touch_force.unwrap_or(0.0) > 0.0 {
+                thickness_multipler += touch_force.unwrap_or(0.0);
+            }
+            if let Some(pointer) = ui.ctx().input(|i| i.pointer.hover_pos()) {
+                let from_screen = emath::RectTransform::from_to(
+                    response
+                        .rect
+                        .scale_from_center(5.0 * self.zoom)
+                        .translate(self.zoom * -self.pan * response.rect.size()),
+                    5.0 / 2.0 * STANDARD_COORD_BOUNDS,
+                );
+                let transformed_pointer_pos = from_screen * pointer;
+                let zoom_delta = ui.ctx().input(|i| i.zoom_delta());
+                if zoom_delta != 1.0 {
+                    self.pan += (zoom_delta - 1.0) * (transformed_pointer_pos - self.pan).to_vec2();
+                    self.zoom *= zoom_delta;
+                    did_drag = true;
+                }
             }
         }
         if response.dragged() && drag_input {
